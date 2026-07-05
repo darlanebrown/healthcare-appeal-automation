@@ -15,6 +15,15 @@ src/
 └── styles/       # Global and shared stylesheets
 ```
 
+## Core Types
+
+`src/types/records.ts` defines the shape of an appeal record:
+
+- `DenialReason` — the enumerated set of reasons a claim was denied (e.g. `"Medical Necessity"`, `"Prior Authorization"`, `"Coding Error"`, `"Timely Filing"`, `"Eligibility"`, `"Missing Documentation"`, `"Other"`).
+- `Records` — patient, claim, and clinical documentation fields (patient/member identifiers, claim/billing details, ICD/CPT/revenue codes, denial reason, and supporting clinical notes) used throughout the appeal workflow.
+
+`src/utils/validateRecord.ts` provides `validateRecord(record: Records): ValidationResult`, which checks that all required fields are populated and that `denialReason` is one of the valid `DenialReason` values.
+
 ## Getting Started
 
 Install dependencies:
@@ -35,3 +44,4 @@ npm run dev
 - `npm run build` — type-check and build for production
 - `npm run lint` — run ESLint
 - `npm run preview` — preview the production build locally
+- `npm run test` — run the Vitest test suite
