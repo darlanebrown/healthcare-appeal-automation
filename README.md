@@ -30,6 +30,10 @@ All utilities in `src/utils/` are TDD'd (test file written and confirmed failing
 - `getMissingDocuments(record: Records): string[]` — returns a checklist of missing clinical evidence (doctor summary, notes, H&P, labs, ICD/CPT codes), plus the authorization number when `denialReason` is `"Prior Authorization"`.
 - `generateAppealDocket(record: Records): string` — renders the patient, claim, and clinical evidence fields into the final Appeal Docket text used in `App.tsx`.
 
+## Styling
+
+`src/App.css` styles the appeal intake layout: a gradient hero header, a two-column grid (`.forms` for input cards, `.docket` as a sticky sidebar showing the missing-evidence checklist and generated docket), collapsing to a single column below 900px. Plain CSS has no runtime logic to unit test, so this is verified visually via `npm run dev` rather than with Vitest.
+
 ## Getting Started
 
 Install dependencies:
