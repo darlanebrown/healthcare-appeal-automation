@@ -22,17 +22,28 @@ src/
 - `DenialReason` — the enumerated set of reasons a claim was denied (e.g. `"Medical Necessity"`, `"Prior Authorization"`, `"Coding Error"`, `"Timely Filing"`, `"Eligibility"`, `"Missing Documentation"`, `"Other"`).
 - `Records` — patient, claim, and clinical documentation fields (patient/member identifiers, claim/billing details, ICD/CPT/revenue codes, denial reason, and supporting clinical notes) used throughout the appeal workflow.
 
+## Pages & Components
+
+`App.tsx` is a thin shell that renders `pages/AppealPage.tsx`, which owns the `Records` state and composes the form:
+
+- `components/PatientInfoCard.tsx` — patient/encounter identifier fields
+- `components/BillingCard.tsx` — claim/billing fields and the denial reason select
+- `components/ClinicalEvidenceForm.tsx` — doctor summary, progress/nurse notes, consult notes, H&P, and labs cards
+- `components/AppealDocketSidebar.tsx` — missing-evidence checklist, generate button, and rendered docket
+
+Each form component takes `{ record, onChange }` and calls `onChange(field, value)`, keeping state lifted in `AppealPage`.
+
 ## Utilities
 
 All utilities in `src/utils/` are TDD'd (test file written and confirmed failing before implementation):
 
 - `validateRecord(record: Records): ValidationResult` — checks that all required fields are populated and that `denialReason` is one of the valid `DenialReason` values.
 - `getMissingDocuments(record: Records): string[]` — returns a checklist of missing clinical evidence (doctor summary, notes, H&P, labs, ICD/CPT codes), plus the authorization number when `denialReason` is `"Prior Authorization"`.
-- `generateAppealDocket(record: Records): string` — renders the patient, claim, and clinical evidence fields into the final Appeal Docket text used in `App.tsx`.
+- `generateAppealDocket(record: Records): string` — renders the patient, claim, and clinical evidence fields into the final Appeal Docket text used in `AppealPage`.
 
 ## Styling
 
-`src/App.css` styles the appeal intake layout: a gradient hero header, a two-column grid (`.forms` for input cards, `.docket` as a sticky sidebar showing the missing-evidence checklist and generated docket), collapsing to a single column below 900px. Plain CSS has no runtime logic to unit test, so this is verified visually via `npm run dev` rather than with Vitest.
+`src/styles/App.css` styles the appeal intake layout: a gradient hero header, a two-column grid (`.forms` for input cards, `.docket` as a sticky sidebar showing the missing-evidence checklist and generated docket), collapsing to a single column below 900px. Plain CSS has no runtime logic to unit test, so this is verified visually via `npm run dev` rather than with Vitest.
 
 ## Getting Started
 
