@@ -52,13 +52,24 @@ All utilities in `src/utils/` are TDD'd (test file written and confirmed failing
 
 ## Epic Integration (Scaffold)
 
-Toward automating data entry from Epic instead of typing it in by hand: this app is meant to be **EHR-launched** from inside Epic (embedded in a clinician's session, SMART EHR launch), so auth reuses that session context rather than a separate login. No Epic App Orchard registration exists yet, so this is a working scaffold behind placeholder env vars (`VITE_EPIC_CLIENT_ID`, `VITE_EPIC_REDIRECT_URI`, `VITE_EPIC_SCOPES` in `.env.example`) — not yet wired into the UI.
+Toward automating data entry from Epic instead of typing it in by hand. Two SMART on FHIR launch flows are supported:
 
-- `services/epicAuth.ts` — the SMART on FHIR public-client PKCE flow: `parseLaunchParams` (reads `iss`/`launch` off the EHR launch URL), `generatePkcePair` (verifier + SHA-256 challenge), `buildAuthorizationUrl`, `discoverSmartEndpoints` (reads `/.well-known/smart-configuration`), and `exchangeCodeForToken`.
+- **EHR launch** — for real production use: the app is opened *from inside* a live Epic session (e.g. a clinician's chart in Hyperspace), which hands it `iss` (the FHIR base URL) and a `launch` token via the URL. Auth reuses that session context.
+- **Standalone launch** — for testing against [Epic's free public sandbox](https://fhir.epic.com) (no live Epic instance required): the app already knows its FHIR base URL (`VITE_EPIC_FHIR_BASE_URL`) and kicks off the OAuth redirect itself, using `scope=launch/patient` instead of a `launch` token, since there's no EHR session to hand one over.
+
+No Epic App Orchard registration exists yet, so this is a working scaffold behind placeholder env vars (`VITE_EPIC_CLIENT_ID`, `VITE_EPIC_REDIRECT_URI`, `VITE_EPIC_SCOPES`, `VITE_EPIC_FHIR_BASE_URL` in `.env.example`) — not yet wired into the UI.
+
+- `services/epicAuth.ts`:
+  - `parseLaunchParams` — reads `iss`/`launch` off an EHR launch URL
+  - `generatePkcePair` — PKCE verifier + SHA-256 challenge
+  - `buildAuthorizationUrl` — builds the OAuth authorize URL (`launch` is optional, per the standalone case above)
+  - `discoverSmartEndpoints` — reads `/.well-known/smart-configuration` for the authorization/token endpoints
+  - `exchangeCodeForToken` — trades an authorization code + PKCE verifier for an access token
+  - `startStandaloneLaunch` / `completeStandaloneLaunch` — the full standalone flow: discovers endpoints, generates and stores the PKCE verifier/state/FHIR base URL in `sessionStorage`, redirects to Epic (`start`), then on callback validates `state`, exchanges the code, and clears the stored state (`complete`)
 - `services/epicFhirClient.ts` — `fetchPatient`, `fetchPatientConditions`, `fetchDocumentReferences`, `fetchLabObservations`, and `fetchEpicPatientData` (fetches all four together) against the FHIR REST API with a bearer token.
 - `utils/mapEpicDataToRecord.ts` — pure mapping from fetched FHIR data to `Partial<Records>`: patient name/DOB, first ICD-coded condition, `DocumentReference`s routed to `progressNotes`/`historyAndPhysical`/`consultNotes`/`doctorSummary`/`nurseNotes` by matching their `type` text (multiple documents of the same type are joined), and lab `Observation`s joined into `labs`. Only pulls clinical data — Epic isn't a payer system, so claim/billing/denial fields still need a separate source.
 
-All three are TDD'd (test file written and confirmed failing before implementation) against mocked `fetch`/pure inputs — no network or real Epic sandbox required to verify the logic. Next steps to make this real: register the app in Epic's App Orchard, swap the placeholder env vars for real values, and add the launch/callback routes plus an "Import from Epic" action in the UI that calls `fetchEpicPatientData` → `mapEpicDataToRecord` and merges the result into the form state.
+All of this is TDD'd (test file written and confirmed failing before implementation) against mocked `fetch`/`sessionStorage`/`location`/pure inputs — no network or real Epic sandbox required to verify the logic. Next steps to make this real: register a free non-production app at fhir.epic.com to get a real client ID, sandbox FHIR base URL, and test patients; swap the placeholder env vars for those real values; call `startStandaloneLaunch` (sandbox) or handle an EHR launch URL with `parseLaunchParams` (production) plus a callback route calling `completeStandaloneLaunch`/`exchangeCodeForToken`; and add an "Import from Epic" action in the UI that calls `fetchEpicPatientData` → `mapEpicDataToRecord` and merges the result into the form state.
 
 ## Styling
 
@@ -66,7 +77,7 @@ All three are TDD'd (test file written and confirmed failing before implementati
 
 ## Testing
 
-Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 8 test files, 47 tests.
+Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 8 test files, 52 tests.
 
 - `utils/validateRecord.test.ts` — required-field and `denialReason` validation
 - `utils/getMissingDocuments.test.ts` — missing-evidence checklist rules
@@ -74,7 +85,7 @@ Every module in `src/utils/` and `src/services/` was built TDD-style: its test f
 - `utils/supplies.test.ts` — create/add/remove/update helpers for the real-time supplies list
 - `utils/mapEpicDataToRecord.test.ts` — FHIR data → `Records` field mapping
 - `services/appealService.test.ts` — `submitAppeal` against a mocked `fetch`
-- `services/epicAuth.test.ts` — SMART launch parsing, PKCE, authorization URL, discovery, and token exchange
+- `services/epicAuth.test.ts` — SMART launch parsing, PKCE, authorization URL, discovery, token exchange, and the standalone launch start/complete flow against mocked `fetch`/`sessionStorage`/`location`
 - `services/epicFhirClient.test.ts` — Patient/Condition/DocumentReference/Observation fetches against a mocked `fetch`
 
 Run the suite with `npm run test`.

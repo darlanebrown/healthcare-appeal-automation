@@ -1,11 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildAuthorizationUrl,
+  completeStandaloneLaunch,
   discoverSmartEndpoints,
   exchangeCodeForToken,
   generatePkcePair,
   parseLaunchParams,
+  startStandaloneLaunch,
 } from "./epicAuth";
+
+function createStorageMock(initial: Record<string, string> = {}) {
+  const store: Record<string, string> = { ...initial };
+  return {
+    getItem: vi.fn((key: string) => store[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+  };
+}
 
 describe("parseLaunchParams", () => {
   it("extracts iss and launch from a query string", () => {
@@ -59,6 +74,20 @@ describe("buildAuthorizationUrl", () => {
     expect(parsed.searchParams.get("state")).toBe("state-xyz");
     expect(parsed.searchParams.get("code_challenge")).toBe("challenge-abc");
     expect(parsed.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
+  it("omits the launch param for standalone launch (no launch value)", () => {
+    const url = buildAuthorizationUrl({
+      authorizationEndpoint: "https://epic.example.org/oauth2/authorize",
+      clientId: "client-123",
+      redirectUri: "https://app.example.com/callback",
+      scope: "launch/patient openid fhirUser patient/*.read",
+      iss: "https://epic.example.org/fhir",
+      state: "state-xyz",
+      codeChallenge: "challenge-abc",
+    });
+
+    expect(new URL(url).searchParams.has("launch")).toBe(false);
   });
 });
 
@@ -136,5 +165,124 @@ describe("exchangeCodeForToken", () => {
         codeVerifier: "verifier-abc",
       }),
     ).rejects.toThrow("Failed to exchange code for token: 400 Bad Request");
+  });
+});
+
+describe("startStandaloneLaunch", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("discovers endpoints, stores the PKCE verifier/state/fhirBaseUrl, and redirects to the authorization URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        authorization_endpoint: "https://epic.example.org/oauth2/authorize",
+        token_endpoint: "https://epic.example.org/oauth2/token",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const storage = createStorageMock();
+    vi.stubGlobal("sessionStorage", storage);
+
+    const location = { assign: vi.fn() };
+    vi.stubGlobal("location", location);
+
+    await startStandaloneLaunch({
+      fhirBaseUrl: "https://epic.example.org/fhir",
+      clientId: "client-123",
+      redirectUri: "https://app.example.com/callback",
+      scope: "launch/patient openid fhirUser patient/*.read",
+    });
+
+    expect(storage.setItem).toHaveBeenCalledTimes(1);
+    const [key, storedValue] = storage.setItem.mock.calls[0];
+    expect(key).toBe("epic_standalone_launch");
+    const stored = JSON.parse(storedValue);
+    expect(stored.fhirBaseUrl).toBe("https://epic.example.org/fhir");
+    expect(typeof stored.verifier).toBe("string");
+    expect(typeof stored.state).toBe("string");
+
+    expect(location.assign).toHaveBeenCalledTimes(1);
+    const redirectUrl = new URL(location.assign.mock.calls[0][0]);
+    expect(redirectUrl.origin + redirectUrl.pathname).toBe("https://epic.example.org/oauth2/authorize");
+    expect(redirectUrl.searchParams.get("state")).toBe(stored.state);
+    expect(redirectUrl.searchParams.get("aud")).toBe("https://epic.example.org/fhir");
+    expect(redirectUrl.searchParams.has("launch")).toBe(false);
+  });
+});
+
+describe("completeStandaloneLaunch", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("exchanges the code using the stored verifier and returns the token result", async () => {
+    const storedState = "state-abc";
+    const storage = createStorageMock({
+      epic_standalone_launch: JSON.stringify({
+        verifier: "verifier-xyz",
+        state: storedState,
+        fhirBaseUrl: "https://epic.example.org/fhir",
+      }),
+    });
+    vi.stubGlobal("sessionStorage", storage);
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          authorization_endpoint: "https://epic.example.org/oauth2/authorize",
+          token_endpoint: "https://epic.example.org/oauth2/token",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ access_token: "token-abc", patient: "pt-1" }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await completeStandaloneLaunch(`?code=auth-code&state=${storedState}`, {
+      clientId: "client-123",
+      redirectUri: "https://app.example.com/callback",
+    });
+
+    expect(result).toEqual({
+      accessToken: "token-abc",
+      patientId: "pt-1",
+      fhirBaseUrl: "https://epic.example.org/fhir",
+    });
+    expect(storage.removeItem).toHaveBeenCalledWith("epic_standalone_launch");
+  });
+
+  it("throws when the callback state does not match the stored state", async () => {
+    const storage = createStorageMock({
+      epic_standalone_launch: JSON.stringify({
+        verifier: "verifier-xyz",
+        state: "expected-state",
+        fhirBaseUrl: "https://epic.example.org/fhir",
+      }),
+    });
+    vi.stubGlobal("sessionStorage", storage);
+
+    await expect(
+      completeStandaloneLaunch("?code=auth-code&state=wrong-state", {
+        clientId: "client-123",
+        redirectUri: "https://app.example.com/callback",
+      }),
+    ).rejects.toThrow("State mismatch in standalone launch callback");
+  });
+
+  it("throws when there is no stored launch state", async () => {
+    vi.stubGlobal("sessionStorage", createStorageMock());
+
+    await expect(
+      completeStandaloneLaunch("?code=auth-code&state=state-abc", {
+        clientId: "client-123",
+        redirectUri: "https://app.example.com/callback",
+      }),
+    ).rejects.toThrow("Missing standalone launch callback parameters or stored launch state");
   });
 });

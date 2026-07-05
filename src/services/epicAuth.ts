@@ -28,7 +28,7 @@ export function buildAuthorizationUrl(params: {
   clientId: string;
   redirectUri: string;
   scope: string;
-  launch: string;
+  launch?: string;
   iss: string;
   state: string;
   codeChallenge: string;
@@ -38,7 +38,9 @@ export function buildAuthorizationUrl(params: {
   url.searchParams.set("client_id", params.clientId);
   url.searchParams.set("redirect_uri", params.redirectUri);
   url.searchParams.set("scope", params.scope);
-  url.searchParams.set("launch", params.launch);
+  if (params.launch) {
+    url.searchParams.set("launch", params.launch);
+  }
   url.searchParams.set("aud", params.iss);
   url.searchParams.set("state", params.state);
   url.searchParams.set("code_challenge", params.codeChallenge);
@@ -78,4 +80,74 @@ export async function exchangeCodeForToken(
   }
 
   return response.json();
+}
+
+const STANDALONE_LAUNCH_STORAGE_KEY = "epic_standalone_launch";
+
+export type StandaloneLaunchConfig = {
+  fhirBaseUrl: string;
+  clientId: string;
+  redirectUri: string;
+  scope: string;
+};
+
+export type StandaloneLaunchResult = {
+  accessToken: string;
+  patientId?: string;
+  fhirBaseUrl: string;
+};
+
+export async function startStandaloneLaunch(config: StandaloneLaunchConfig): Promise<void> {
+  const { authorizationEndpoint } = await discoverSmartEndpoints(config.fhirBaseUrl);
+  const { verifier, challenge } = await generatePkcePair();
+  const state = crypto.randomUUID();
+
+  sessionStorage.setItem(
+    STANDALONE_LAUNCH_STORAGE_KEY,
+    JSON.stringify({ verifier, state, fhirBaseUrl: config.fhirBaseUrl }),
+  );
+
+  const url = buildAuthorizationUrl({
+    authorizationEndpoint,
+    clientId: config.clientId,
+    redirectUri: config.redirectUri,
+    scope: config.scope,
+    iss: config.fhirBaseUrl,
+    state,
+    codeChallenge: challenge,
+  });
+
+  location.assign(url);
+}
+
+export async function completeStandaloneLaunch(
+  callbackSearch: string,
+  config: { clientId: string; redirectUri: string },
+): Promise<StandaloneLaunchResult> {
+  const params = new URLSearchParams(callbackSearch);
+  const code = params.get("code");
+  const state = params.get("state");
+  const stored = sessionStorage.getItem(STANDALONE_LAUNCH_STORAGE_KEY);
+
+  if (!code || !state || !stored) {
+    throw new Error("Missing standalone launch callback parameters or stored launch state");
+  }
+
+  const { verifier, state: storedState, fhirBaseUrl } = JSON.parse(stored);
+
+  if (state !== storedState) {
+    throw new Error("State mismatch in standalone launch callback");
+  }
+
+  const { tokenEndpoint } = await discoverSmartEndpoints(fhirBaseUrl);
+  const token = await exchangeCodeForToken(tokenEndpoint, {
+    code,
+    redirectUri: config.redirectUri,
+    clientId: config.clientId,
+    codeVerifier: verifier,
+  });
+
+  sessionStorage.removeItem(STANDALONE_LAUNCH_STORAGE_KEY);
+
+  return { accessToken: token.access_token, patientId: token.patient, fhirBaseUrl };
 }
