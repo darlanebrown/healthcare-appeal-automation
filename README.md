@@ -51,6 +51,17 @@ All utilities in `src/utils/` are TDD'd (test file written and confirmed failing
 
 `src/styles/App.css` styles the appeal intake layout: a gradient hero header, a two-column grid (`.forms` for input cards, `.docket` as a sticky sidebar showing the missing-evidence checklist and generated docket), collapsing to a single column below 900px. Plain CSS has no runtime logic to unit test, so this is verified visually via `npm run dev` rather than with Vitest.
 
+## Testing
+
+Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 4 test files, 17 tests.
+
+- `utils/validateRecord.test.ts` — required-field and `denialReason` validation
+- `utils/getMissingDocuments.test.ts` — missing-evidence checklist rules
+- `utils/generateAppealDocket.test.ts` — appeal letter content
+- `services/appealService.test.ts` — `submitAppeal` against a mocked `fetch`
+
+Run the suite with `npm run test`.
+
 ## Getting Started
 
 Install dependencies:
