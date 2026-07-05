@@ -50,19 +50,32 @@ All utilities in `src/utils/` are TDD'd (test file written and confirmed failing
 
 `VITE_API_BASE_URL` is read from the environment (see `.env.example`); no real backend is wired up yet, so this defaults to a placeholder URL. Not yet called from the UI — currently only available as a service function.
 
+## Epic Integration (Scaffold)
+
+Toward automating data entry from Epic instead of typing it in by hand: this app is meant to be **EHR-launched** from inside Epic (embedded in a clinician's session, SMART EHR launch), so auth reuses that session context rather than a separate login. No Epic App Orchard registration exists yet, so this is a working scaffold behind placeholder env vars (`VITE_EPIC_CLIENT_ID`, `VITE_EPIC_REDIRECT_URI`, `VITE_EPIC_SCOPES` in `.env.example`) — not yet wired into the UI.
+
+- `services/epicAuth.ts` — the SMART on FHIR public-client PKCE flow: `parseLaunchParams` (reads `iss`/`launch` off the EHR launch URL), `generatePkcePair` (verifier + SHA-256 challenge), `buildAuthorizationUrl`, `discoverSmartEndpoints` (reads `/.well-known/smart-configuration`), and `exchangeCodeForToken`.
+- `services/epicFhirClient.ts` — `fetchPatient`, `fetchPatientConditions`, `fetchDocumentReferences`, `fetchLabObservations`, and `fetchEpicPatientData` (fetches all four together) against the FHIR REST API with a bearer token.
+- `utils/mapEpicDataToRecord.ts` — pure mapping from fetched FHIR data to `Partial<Records>`: patient name/DOB, first ICD-coded condition, `DocumentReference`s routed to `progressNotes`/`historyAndPhysical`/`consultNotes`/`doctorSummary`/`nurseNotes` by matching their `type` text (multiple documents of the same type are joined), and lab `Observation`s joined into `labs`. Only pulls clinical data — Epic isn't a payer system, so claim/billing/denial fields still need a separate source.
+
+All three are TDD'd (test file written and confirmed failing before implementation) against mocked `fetch`/pure inputs — no network or real Epic sandbox required to verify the logic. Next steps to make this real: register the app in Epic's App Orchard, swap the placeholder env vars for real values, and add the launch/callback routes plus an "Import from Epic" action in the UI that calls `fetchEpicPatientData` → `mapEpicDataToRecord` and merges the result into the form state.
+
 ## Styling
 
 `src/styles/App.css` styles the appeal intake layout: a gradient hero header, a two-column grid (`.forms` for input cards, `.docket` as a sticky sidebar showing the missing-evidence checklist and generated docket), collapsing to a single column below 900px. Plain CSS has no runtime logic to unit test, so this is verified visually via `npm run dev` rather than with Vitest.
 
 ## Testing
 
-Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 5 test files, 26 tests.
+Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 8 test files, 47 tests.
 
 - `utils/validateRecord.test.ts` — required-field and `denialReason` validation
 - `utils/getMissingDocuments.test.ts` — missing-evidence checklist rules
 - `utils/generateAppealDocket.test.ts` — appeal letter content, including the supplies-used section
 - `utils/supplies.test.ts` — create/add/remove/update helpers for the real-time supplies list
+- `utils/mapEpicDataToRecord.test.ts` — FHIR data → `Records` field mapping
 - `services/appealService.test.ts` — `submitAppeal` against a mocked `fetch`
+- `services/epicAuth.test.ts` — SMART launch parsing, PKCE, authorization URL, discovery, and token exchange
+- `services/epicFhirClient.test.ts` — Patient/Condition/DocumentReference/Observation fetches against a mocked `fetch`
 
 Run the suite with `npm run test`.
 

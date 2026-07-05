@@ -1,0 +1,139 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  fetchDocumentReferences,
+  fetchEpicPatientData,
+  fetchLabObservations,
+  fetchPatient,
+  fetchPatientConditions,
+} from "./epicFhirClient";
+
+const FHIR_BASE = "https://epic.example.org/fhir";
+const TOKEN = "token-abc";
+
+function mockFetchOnce(body: unknown) {
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(body) });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("fetchPatient", () => {
+  it("GETs Patient/{id} with a bearer token and returns the resource", async () => {
+    const patient = { resourceType: "Patient", id: "pt-1" };
+    const fetchMock = mockFetchOnce(patient);
+
+    const result = await fetchPatient(FHIR_BASE, TOKEN, "pt-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${FHIR_BASE}/Patient/pt-1`,
+      { headers: { Authorization: `Bearer ${TOKEN}`, Accept: "application/fhir+json" } },
+    );
+    expect(result).toEqual(patient);
+  });
+
+  it("throws when the response is not ok", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404, statusText: "Not Found" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchPatient(FHIR_BASE, TOKEN, "missing")).rejects.toThrow(
+      "Failed to fetch Patient/missing: 404 Not Found",
+    );
+  });
+});
+
+describe("fetchPatientConditions", () => {
+  it("searches Condition?patient={id} and extracts resources from the bundle", async () => {
+    const bundle = {
+      resourceType: "Bundle",
+      entry: [{ resource: { resourceType: "Condition", id: "c1" } }],
+    };
+    const fetchMock = mockFetchOnce(bundle);
+
+    const result = await fetchPatientConditions(FHIR_BASE, TOKEN, "pt-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${FHIR_BASE}/Condition?patient=pt-1`,
+      { headers: { Authorization: `Bearer ${TOKEN}`, Accept: "application/fhir+json" } },
+    );
+    expect(result).toEqual([{ resourceType: "Condition", id: "c1" }]);
+  });
+
+  it("returns an empty array when the bundle has no entries", async () => {
+    mockFetchOnce({ resourceType: "Bundle" });
+    const result = await fetchPatientConditions(FHIR_BASE, TOKEN, "pt-1");
+    expect(result).toEqual([]);
+  });
+});
+
+describe("fetchDocumentReferences", () => {
+  it("searches DocumentReference?patient={id} and extracts resources", async () => {
+    const bundle = {
+      resourceType: "Bundle",
+      entry: [{ resource: { resourceType: "DocumentReference", id: "d1" } }],
+    };
+    const fetchMock = mockFetchOnce(bundle);
+
+    const result = await fetchDocumentReferences(FHIR_BASE, TOKEN, "pt-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${FHIR_BASE}/DocumentReference?patient=pt-1`,
+      { headers: { Authorization: `Bearer ${TOKEN}`, Accept: "application/fhir+json" } },
+    );
+    expect(result).toEqual([{ resourceType: "DocumentReference", id: "d1" }]);
+  });
+});
+
+describe("fetchLabObservations", () => {
+  it("searches Observation?patient={id}&category=laboratory and extracts resources", async () => {
+    const bundle = {
+      resourceType: "Bundle",
+      entry: [{ resource: { resourceType: "Observation", id: "o1" } }],
+    };
+    const fetchMock = mockFetchOnce(bundle);
+
+    const result = await fetchLabObservations(FHIR_BASE, TOKEN, "pt-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${FHIR_BASE}/Observation?patient=pt-1&category=laboratory`,
+      { headers: { Authorization: `Bearer ${TOKEN}`, Accept: "application/fhir+json" } },
+    );
+    expect(result).toEqual([{ resourceType: "Observation", id: "o1" }]);
+  });
+});
+
+describe("fetchEpicPatientData", () => {
+  it("fetches the patient, conditions, documents, and labs together", async () => {
+    const patient = { resourceType: "Patient", id: "pt-1" };
+    const responsesByUrl: Record<string, unknown> = {
+      [`${FHIR_BASE}/Patient/pt-1`]: patient,
+      [`${FHIR_BASE}/Condition?patient=pt-1`]: {
+        resourceType: "Bundle",
+        entry: [{ resource: { resourceType: "Condition", id: "c1" } }],
+      },
+      [`${FHIR_BASE}/DocumentReference?patient=pt-1`]: {
+        resourceType: "Bundle",
+        entry: [{ resource: { resourceType: "DocumentReference", id: "d1" } }],
+      },
+      [`${FHIR_BASE}/Observation?patient=pt-1&category=laboratory`]: {
+        resourceType: "Bundle",
+        entry: [{ resource: { resourceType: "Observation", id: "o1" } }],
+      },
+    };
+    const fetchMock = vi.fn((url: string) =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(responsesByUrl[url]) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchEpicPatientData(FHIR_BASE, TOKEN, "pt-1");
+
+    expect(result).toEqual({
+      patient,
+      conditions: [{ resourceType: "Condition", id: "c1" }],
+      documents: [{ resourceType: "DocumentReference", id: "d1" }],
+      labs: [{ resourceType: "Observation", id: "o1" }],
+    });
+  });
+});
