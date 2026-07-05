@@ -10,6 +10,7 @@ function makeRecord(overrides: Partial<Records> = {}): Records {
     accountNumber: "ACC456",
     memberId: "MEM789",
     insuranceCompany: "Acme Health",
+    supplies: [],
     claimNumber: "CLM001",
     dateOfService: "2026-01-15",
     procedure: "Outpatient MRI",
@@ -61,5 +62,26 @@ describe("generateAppealDocket", () => {
 
     expect(docket).toContain("Requested Outcome:");
     expect(docket).toContain("Approve and process payment");
+  });
+
+  it("lists supplies used, without any cost", () => {
+    const docket = generateAppealDocket(
+      makeRecord({
+        supplies: [
+          { id: "1", name: "Splint", quantity: "1", code: "A123" },
+          { id: "2", name: "Brace", quantity: "2", code: "B456" },
+        ],
+      }),
+    );
+
+    expect(docket).toContain("Supplies Used:");
+    expect(docket).toContain("Splint (Qty: 1, Code: A123)");
+    expect(docket).toContain("Brace (Qty: 2, Code: B456)");
+  });
+
+  it("omits the supplies section when no supplies were recorded", () => {
+    const docket = generateAppealDocket(makeRecord({ supplies: [] }));
+
+    expect(docket).not.toContain("Supplies Used:");
   });
 });

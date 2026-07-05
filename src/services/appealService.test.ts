@@ -10,6 +10,7 @@ function makeRecord(overrides: Partial<Records> = {}): Records {
     accountNumber: "ACC456",
     memberId: "MEM789",
     insuranceCompany: "Acme Health",
+    supplies: [],
     claimNumber: "CLM001",
     dateOfService: "2026-01-15",
     procedure: "Outpatient MRI",

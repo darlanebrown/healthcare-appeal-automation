@@ -2,7 +2,9 @@ import { useState } from "react";
 import type { Records } from "../types";
 import { getMissingDocuments } from "../utils/getMissingDocuments";
 import { generateAppealDocket } from "../utils/generateAppealDocket";
+import { addSupply, removeSupply, updateSupplyField } from "../utils/supplies";
 import { PatientInfoCard } from "../components/PatientInfoCard";
+import { SuppliesCard } from "../components/SuppliesCard";
 import { BillingCard } from "../components/BillingCard";
 import { ClinicalEvidenceForm } from "../components/ClinicalEvidenceForm";
 import { AppealDocketSidebar } from "../components/AppealDocketSidebar";
@@ -15,6 +17,8 @@ const initialRecord: Records = {
   accountNumber: "",
   memberId: "",
   insuranceCompany: "",
+
+  supplies: [],
 
   claimNumber: "",
   dateOfService: "",
@@ -52,6 +56,21 @@ export function AppealPage() {
     setAppealDocket(generateAppealDocket(record));
   }
 
+  function handleAddSupply() {
+    setRecord((current) => ({ ...current, supplies: addSupply(current.supplies) }));
+  }
+
+  function handleRemoveSupply(id: string) {
+    setRecord((current) => ({ ...current, supplies: removeSupply(current.supplies, id) }));
+  }
+
+  function handleUpdateSupply(id: string, field: "name" | "quantity" | "code", value: string) {
+    setRecord((current) => ({
+      ...current,
+      supplies: updateSupplyField(current.supplies, id, field, value),
+    }));
+  }
+
   const missingDocuments = getMissingDocuments(record);
 
   return (
@@ -68,6 +87,12 @@ export function AppealPage() {
       <section className="layout">
         <div className="forms">
           <PatientInfoCard record={record} onChange={updateField} />
+          <SuppliesCard
+            supplies={record.supplies}
+            onAdd={handleAddSupply}
+            onRemove={handleRemoveSupply}
+            onUpdate={handleUpdateSupply}
+          />
           <BillingCard record={record} onChange={updateField} />
           <ClinicalEvidenceForm record={record} onChange={updateField} />
         </div>

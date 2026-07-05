@@ -95,6 +95,24 @@ button:hover {
   background: #115e59;
 }
 
+.supply-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.supply-row button {
+  width: auto;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: #b91c1c;
+}
+
+.supply-row button:hover {
+  background: #991b1b;
+}
+
 .docket {
   position: sticky;
   top: 20px;

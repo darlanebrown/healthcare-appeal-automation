@@ -20,13 +20,15 @@ src/
 `src/types/records.ts` defines the shape of an appeal record:
 
 - `DenialReason` — the enumerated set of reasons a claim was denied (e.g. `"Medical Necessity"`, `"Prior Authorization"`, `"Coding Error"`, `"Timely Filing"`, `"Eligibility"`, `"Missing Documentation"`, `"Other"`).
-- `Records` — patient, claim, and clinical documentation fields (patient/member identifiers, claim/billing details, procedure, ICD/CPT/revenue codes, denial reason, supporting clinical notes, and the requested outcome) used throughout the appeal workflow.
+- `Records` — patient, claim, and clinical documentation fields (patient/member identifiers, supplies used, claim/billing details, procedure, ICD/CPT/revenue codes, denial reason, supporting clinical notes, and the requested outcome) used throughout the appeal workflow.
+- `Supply` (in `src/types/supply.ts`) — a single supply/implant item used during the procedure: `name`, `quantity`, and a supply/HCPCS `code`. Deliberately has **no cost field** — supplies are logged in real time during the procedure, before coding/billing happens; cost is attached later on the claim via `BillingCard`'s billed/denied amounts.
 
 ## Pages & Components
 
 `App.tsx` is a thin shell that renders `pages/AppealPage.tsx`, which owns the `Records` state and composes the form:
 
 - `components/PatientInfoCard.tsx` — patient/encounter identifier fields
+- `components/SuppliesCard.tsx` — add/remove/edit the real-time supplies list (`AppealPage` wires this to `utils/supplies.ts`); sits before billing since supplies are recorded during the procedure, ahead of coding/billing
 - `components/BillingCard.tsx` — claim/billing fields, procedure, and the denial reason select
 - `components/ClinicalEvidenceForm.tsx` — doctor summary, progress/nurse notes, consult notes, H&P, labs, and requested outcome cards
 - `components/AppealDocketSidebar.tsx` — missing-evidence checklist, generate button, and rendered docket
@@ -39,7 +41,8 @@ All utilities in `src/utils/` are TDD'd (test file written and confirmed failing
 
 - `validateRecord(record: Records): ValidationResult` — checks that all required fields are populated and that `denialReason` is one of the valid `DenialReason` values.
 - `getMissingDocuments(record: Records): string[]` — flags a missing doctor's summary, progress notes, or labs, plus a denial-reason-specific requirement: a medical necessity statement when `denialReason` is `"Medical Necessity"`, or prior authorization documentation when it's `"Prior Authorization"`.
-- `generateAppealDocket(record: Records): string` — renders an appeal letter (addressed to the Appeals Department) covering patient/claim details, clinical evidence, and the requested outcome, used in `AppealPage`.
+- `generateAppealDocket(record: Records): string` — renders an appeal letter (addressed to the Appeals Department) covering patient/claim details, clinical evidence, supplies used (name/quantity/code, no cost), and the requested outcome, used in `AppealPage`.
+- `createEmptySupply`, `addSupply`, `removeSupply`, `updateSupplyField` (in `utils/supplies.ts`) — pure array helpers backing the real-time supplies list; each returns a new `Supply[]` rather than mutating in place.
 
 ## Services
 
@@ -53,11 +56,12 @@ All utilities in `src/utils/` are TDD'd (test file written and confirmed failing
 
 ## Testing
 
-Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 4 test files, 17 tests.
+Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 5 test files, 24 tests.
 
 - `utils/validateRecord.test.ts` — required-field and `denialReason` validation
 - `utils/getMissingDocuments.test.ts` — missing-evidence checklist rules
-- `utils/generateAppealDocket.test.ts` — appeal letter content
+- `utils/generateAppealDocket.test.ts` — appeal letter content, including the supplies-used section
+- `utils/supplies.test.ts` — create/add/remove/update helpers for the real-time supplies list
 - `services/appealService.test.ts` — `submitAppeal` against a mocked `fetch`
 
 Run the suite with `npm run test`.

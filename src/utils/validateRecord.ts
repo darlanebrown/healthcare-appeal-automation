@@ -15,7 +15,7 @@ const DENIAL_REASONS: DenialReason[] = [
   "Other",
 ];
 
-const REQUIRED_STRING_FIELDS: (keyof Records)[] = [
+const REQUIRED_STRING_FIELDS: (keyof Omit<Records, "denialReason" | "supplies">)[] = [
   "patientName",
   "dateOfBirth",
   "medicalRecordNumber",

@@ -1,5 +1,17 @@
 import type { Records } from "../types";
 
+function formatSuppliesSection(record: Records): string {
+  if (record.supplies.length === 0) {
+    return "";
+  }
+
+  const lines = record.supplies
+    .map((supply) => `- ${supply.name} (Qty: ${supply.quantity}, Code: ${supply.code})`)
+    .join("\n");
+
+  return `\nSupplies Used:\n${lines}\n`;
+}
+
 export function generateAppealDocket(record: Records): string {
   return `
 RE: Appeal of Claim Denial
@@ -25,7 +37,7 @@ ${record.progressNotes}
 
 Labs / Diagnostic Evidence:
 ${record.labs}
-
+${formatSuppliesSection(record)}
 Requested Outcome:
 ${record.requestedOutcome}
 

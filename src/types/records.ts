@@ -1,3 +1,5 @@
+import type { Supply } from "./supply";
+
 export type DenialReason =
   | "Medical Necessity"
   | "Prior Authorization"
@@ -14,6 +16,8 @@ export type Records = {
   accountNumber: string;
   memberId: string;
   insuranceCompany: string;
+
+  supplies: Supply[];
 
   claimNumber: string;
   dateOfService: string;
