@@ -17,6 +17,7 @@ export type Records = {
 
   claimNumber: string;
   dateOfService: string;
+  procedure: string;
   billedAmount: string;
   deniedAmount: string;
   icdCode: string;
@@ -31,4 +32,6 @@ export type Records = {
   consultNotes: string;
   historyAndPhysical: string;
   labs: string;
+
+  requestedOutcome: string;
 };

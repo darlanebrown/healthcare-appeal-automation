@@ -12,6 +12,7 @@ function makeRecord(overrides: Partial<Records> = {}): Records {
     insuranceCompany: "Acme Health",
     claimNumber: "CLM001",
     dateOfService: "2026-01-15",
+    procedure: "Outpatient MRI",
     billedAmount: "1000.00",
     deniedAmount: "1000.00",
     icdCode: "E11.9",
@@ -25,37 +26,40 @@ function makeRecord(overrides: Partial<Records> = {}): Records {
     consultNotes: "Consult notes text",
     historyAndPhysical: "H&P text",
     labs: "Labs text",
+    requestedOutcome: "Reprocess and pay the claim in full",
     ...overrides,
   };
 }
 
 describe("generateAppealDocket", () => {
-  it("includes all patient and claim fields", () => {
+  it("addresses the letter to the appeals department and states the claim/patient details", () => {
     const docket = generateAppealDocket(makeRecord());
 
+    expect(docket).toContain("RE: Appeal of Claim Denial");
+    expect(docket).toContain("Dear Appeals Department,");
     expect(docket).toContain("Jane Doe");
-    expect(docket).toContain("MRN123");
+    expect(docket).toContain("MEM789");
+    expect(docket).toContain("Acme Health");
     expect(docket).toContain("CLM001");
+    expect(docket).toContain("2026-01-15");
+    expect(docket).toContain("Outpatient MRI");
     expect(docket).toContain("Medical Necessity");
   });
 
-  it("includes all clinical evidence sections", () => {
+  it("includes the clinical evidence sections", () => {
     const docket = generateAppealDocket(makeRecord());
 
     expect(docket).toContain("Doctor summary text");
     expect(docket).toContain("Progress notes text");
-    expect(docket).toContain("Nurse notes text");
-    expect(docket).toContain("Consult notes text");
-    expect(docket).toContain("H&P text");
     expect(docket).toContain("Labs text");
   });
 
-  it("formats billed and denied amounts with a dollar sign", () => {
+  it("includes the requested outcome", () => {
     const docket = generateAppealDocket(
-      makeRecord({ billedAmount: "500.00", deniedAmount: "500.00" }),
+      makeRecord({ requestedOutcome: "Approve and process payment" }),
     );
 
-    expect(docket).toContain("Billed Amount: $500.00");
-    expect(docket).toContain("Denied Amount: $500.00");
+    expect(docket).toContain("Requested Outcome:");
+    expect(docket).toContain("Approve and process payment");
   });
 });

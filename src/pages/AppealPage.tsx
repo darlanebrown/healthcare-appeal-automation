@@ -18,6 +18,7 @@ const initialRecord: Records = {
 
   claimNumber: "",
   dateOfService: "",
+  procedure: "",
   billedAmount: "",
   deniedAmount: "",
   icdCode: "",
@@ -32,6 +33,8 @@ const initialRecord: Records = {
   consultNotes: "",
   historyAndPhysical: "",
   labs: "",
+
+  requestedOutcome: "",
 };
 
 export function AppealPage() {

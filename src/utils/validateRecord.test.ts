@@ -12,6 +12,7 @@ function makeValidRecord(overrides: Partial<Records> = {}): Records {
     insuranceCompany: "Acme Health",
     claimNumber: "CLM001",
     dateOfService: "2026-01-15",
+    procedure: "Outpatient MRI",
     billedAmount: "1000.00",
     deniedAmount: "1000.00",
     icdCode: "E11.9",
@@ -25,6 +26,7 @@ function makeValidRecord(overrides: Partial<Records> = {}): Records {
     consultNotes: "Notes",
     historyAndPhysical: "H&P",
     labs: "Labs",
+    requestedOutcome: "Reprocess and pay the claim in full",
     ...overrides,
   };
 }
@@ -59,6 +61,18 @@ describe("validateRecord", () => {
       expect.arrayContaining([
         "patientName is required",
         "claimNumber is required",
+      ]),
+    );
+  });
+
+  it("flags missing procedure and requestedOutcome", () => {
+    const result = validateRecord(
+      makeValidRecord({ procedure: "", requestedOutcome: "" }),
+    );
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        "procedure is required",
+        "requestedOutcome is required",
       ]),
     );
   });

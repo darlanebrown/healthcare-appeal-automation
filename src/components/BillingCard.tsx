@@ -12,6 +12,7 @@ export function BillingCard({ record, onChange }: Props) {
 
       <input placeholder="Claim Number" value={record.claimNumber} onChange={(e) => onChange("claimNumber", e.target.value)} />
       <input type="date" value={record.dateOfService} onChange={(e) => onChange("dateOfService", e.target.value)} />
+      <input placeholder="Procedure / Service" value={record.procedure} onChange={(e) => onChange("procedure", e.target.value)} />
       <input placeholder="Billed Amount" value={record.billedAmount} onChange={(e) => onChange("billedAmount", e.target.value)} />
       <input placeholder="Denied Amount" value={record.deniedAmount} onChange={(e) => onChange("deniedAmount", e.target.value)} />
       <input placeholder="ICD-9 / ICD-10 Code" value={record.icdCode} onChange={(e) => onChange("icdCode", e.target.value)} />

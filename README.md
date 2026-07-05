@@ -20,15 +20,15 @@ src/
 `src/types/records.ts` defines the shape of an appeal record:
 
 - `DenialReason` — the enumerated set of reasons a claim was denied (e.g. `"Medical Necessity"`, `"Prior Authorization"`, `"Coding Error"`, `"Timely Filing"`, `"Eligibility"`, `"Missing Documentation"`, `"Other"`).
-- `Records` — patient, claim, and clinical documentation fields (patient/member identifiers, claim/billing details, ICD/CPT/revenue codes, denial reason, and supporting clinical notes) used throughout the appeal workflow.
+- `Records` — patient, claim, and clinical documentation fields (patient/member identifiers, claim/billing details, procedure, ICD/CPT/revenue codes, denial reason, supporting clinical notes, and the requested outcome) used throughout the appeal workflow.
 
 ## Pages & Components
 
 `App.tsx` is a thin shell that renders `pages/AppealPage.tsx`, which owns the `Records` state and composes the form:
 
 - `components/PatientInfoCard.tsx` — patient/encounter identifier fields
-- `components/BillingCard.tsx` — claim/billing fields and the denial reason select
-- `components/ClinicalEvidenceForm.tsx` — doctor summary, progress/nurse notes, consult notes, H&P, and labs cards
+- `components/BillingCard.tsx` — claim/billing fields, procedure, and the denial reason select
+- `components/ClinicalEvidenceForm.tsx` — doctor summary, progress/nurse notes, consult notes, H&P, labs, and requested outcome cards
 - `components/AppealDocketSidebar.tsx` — missing-evidence checklist, generate button, and rendered docket
 
 Each form component takes `{ record, onChange }` and calls `onChange(field, value)`, keeping state lifted in `AppealPage`.
@@ -38,8 +38,8 @@ Each form component takes `{ record, onChange }` and calls `onChange(field, valu
 All utilities in `src/utils/` are TDD'd (test file written and confirmed failing before implementation):
 
 - `validateRecord(record: Records): ValidationResult` — checks that all required fields are populated and that `denialReason` is one of the valid `DenialReason` values.
-- `getMissingDocuments(record: Records): string[]` — returns a checklist of missing clinical evidence (doctor summary, notes, H&P, labs, ICD/CPT codes), plus the authorization number when `denialReason` is `"Prior Authorization"`.
-- `generateAppealDocket(record: Records): string` — renders the patient, claim, and clinical evidence fields into the final Appeal Docket text used in `AppealPage`.
+- `getMissingDocuments(record: Records): string[]` — flags a missing doctor's summary, progress notes, or labs, plus a denial-reason-specific requirement: a medical necessity statement when `denialReason` is `"Medical Necessity"`, or prior authorization documentation when it's `"Prior Authorization"`.
+- `generateAppealDocket(record: Records): string` — renders an appeal letter (addressed to the Appeals Department) covering patient/claim details, clinical evidence, and the requested outcome, used in `AppealPage`.
 
 ## Services
 

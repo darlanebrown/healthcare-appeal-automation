@@ -33,6 +33,11 @@ export function ClinicalEvidenceForm({ record, onChange }: Props) {
         <h2>Labs</h2>
         <textarea value={record.labs} onChange={(e) => onChange("labs", e.target.value)} placeholder="Lab results and diagnostic evidence..." />
       </section>
+
+      <section className="card">
+        <h2>Requested Outcome</h2>
+        <textarea value={record.requestedOutcome} onChange={(e) => onChange("requestedOutcome", e.target.value)} placeholder="What outcome is this appeal requesting..." />
+      </section>
     </>
   );
 }

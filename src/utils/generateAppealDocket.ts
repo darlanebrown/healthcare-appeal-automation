@@ -2,51 +2,37 @@ import type { Records } from "../types";
 
 export function generateAppealDocket(record: Records): string {
   return `
-APPEAL DOCKET
+RE: Appeal of Claim Denial
 
-PATIENT / ENCOUNTER INFORMATION
-Patient Name: ${record.patientName}
-Date of Birth: ${record.dateOfBirth}
-Medical Record Number: ${record.medicalRecordNumber}
-Account Number: ${record.accountNumber}
+Patient: ${record.patientName}
 Member ID: ${record.memberId}
 Insurance Company: ${record.insuranceCompany}
-
-BILLING / CLAIM INFORMATION
 Claim Number: ${record.claimNumber}
 Date of Service: ${record.dateOfService}
-Billed Amount: $${record.billedAmount}
-Denied Amount: $${record.deniedAmount}
-ICD-9 / ICD-10 Code: ${record.icdCode}
-CPT / HCPCS Code: ${record.cptCode}
-Revenue Code: ${record.revenueCode}
-Authorization Number: ${record.authorizationNumber}
-Denial Reason: ${record.denialReason}
+Procedure/Service: ${record.procedure}
 
-CLINICAL EVIDENCE
+Dear Appeals Department,
 
-Doctor Summary:
+I am writing to request reconsideration of the denied claim listed above. The claim was denied for the following reason: ${record.denialReason}.
+
+Based on the clinical documentation, the service was medically appropriate and supported by the patient's condition, provider assessment, and available documentation.
+
+Doctor's Summary:
 ${record.doctorSummary}
 
 Progress Notes:
 ${record.progressNotes}
 
-Nurse Notes:
-${record.nurseNotes}
-
-Consult Notes:
-${record.consultNotes}
-
-History & Physical:
-${record.historyAndPhysical}
-
 Labs / Diagnostic Evidence:
 ${record.labs}
 
-APPEAL REQUEST
+Requested Outcome:
+${record.requestedOutcome}
 
-Based on the billing record, claim denial, diagnosis/procedure codes, and supporting clinical documentation, we respectfully request reconsideration of this denial and reprocessing of the claim for payment.
+Please review the attached documentation and reconsider this denial for payment.
 
-This appeal docket includes evidence from real-time billing, provider documentation, nursing documentation, consult notes, history and physical, and laboratory evidence.
+Sincerely,
+
+Appeals Coordinator
 `;
 }

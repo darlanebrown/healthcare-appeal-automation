@@ -24,6 +24,7 @@ const REQUIRED_STRING_FIELDS: (keyof Records)[] = [
   "insuranceCompany",
   "claimNumber",
   "dateOfService",
+  "procedure",
   "billedAmount",
   "deniedAmount",
   "icdCode",
@@ -36,6 +37,7 @@ const REQUIRED_STRING_FIELDS: (keyof Records)[] = [
   "consultNotes",
   "historyAndPhysical",
   "labs",
+  "requestedOutcome",
 ];
 
 export function validateRecord(record: Records): ValidationResult {
