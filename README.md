@@ -40,7 +40,7 @@ Each form component takes `{ record, onChange }` and calls `onChange(field, valu
 All utilities in `src/utils/` are TDD'd (test file written and confirmed failing before implementation):
 
 - `validateRecord(record: Records): ValidationResult` — checks that all required fields are populated and that `denialReason` is one of the valid `DenialReason` values.
-- `getMissingDocuments(record: Records): string[]` — flags a missing doctor's summary, progress notes, or labs, plus a denial-reason-specific requirement: a medical necessity statement when `denialReason` is `"Medical Necessity"`, or prior authorization documentation when it's `"Prior Authorization"`.
+- `getMissingDocuments(record: Records): string[]` — flags a missing doctor's summary, progress notes, labs, or supplies used (empty `supplies` list), plus a denial-reason-specific requirement: a medical necessity statement when `denialReason` is `"Medical Necessity"`, or prior authorization documentation when it's `"Prior Authorization"`. Drives the Missing Evidence Checklist in `AppealDocketSidebar`.
 - `generateAppealDocket(record: Records): string` — renders an appeal letter (addressed to the Appeals Department) covering patient/claim details, clinical evidence, supplies used (name/quantity/code, no cost), and the requested outcome, used in `AppealPage`.
 - `createEmptySupply`, `addSupply`, `removeSupply`, `updateSupplyField` (in `utils/supplies.ts`) — pure array helpers backing the real-time supplies list; each returns a new `Supply[]` rather than mutating in place.
 
@@ -56,7 +56,7 @@ All utilities in `src/utils/` are TDD'd (test file written and confirmed failing
 
 ## Testing
 
-Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 5 test files, 24 tests.
+Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 5 test files, 26 tests.
 
 - `utils/validateRecord.test.ts` — required-field and `denialReason` validation
 - `utils/getMissingDocuments.test.ts` — missing-evidence checklist rules

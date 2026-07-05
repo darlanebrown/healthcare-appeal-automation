@@ -10,7 +10,7 @@ function makeRecord(overrides: Partial<Records> = {}): Records {
     accountNumber: "ACC456",
     memberId: "MEM789",
     insuranceCompany: "Acme Health",
-    supplies: [],
+    supplies: [{ id: "1", name: "Splint", quantity: "1", code: "A123" }],
     claimNumber: "CLM001",
     dateOfService: "2026-01-15",
     procedure: "Outpatient MRI",
@@ -53,6 +53,19 @@ describe("getMissingDocuments", () => {
     expect(getMissingDocuments(makeRecord({ labs: "" }))).toContain(
       "Lab results or diagnostic evidence",
     );
+  });
+
+  it("flags missing supplies when none have been recorded", () => {
+    expect(getMissingDocuments(makeRecord({ supplies: [] }))).toContain(
+      "Supplies Used",
+    );
+  });
+
+  it("does not flag supplies when at least one has been recorded", () => {
+    const missing = getMissingDocuments(
+      makeRecord({ supplies: [{ id: "1", name: "Brace", quantity: "1", code: "B456" }] }),
+    );
+    expect(missing).not.toContain("Supplies Used");
   });
 
   it("requires a medical necessity statement when denial reason is Medical Necessity", () => {

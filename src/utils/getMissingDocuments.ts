@@ -15,6 +15,10 @@ export function getMissingDocuments(record: Records): string[] {
     missing.push("Lab results or diagnostic evidence");
   }
 
+  if (record.supplies.length === 0) {
+    missing.push("Supplies Used");
+  }
+
   if (record.denialReason === "Medical Necessity") {
     missing.push("Medical necessity statement");
   }
