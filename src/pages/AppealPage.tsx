@@ -90,10 +90,17 @@ export function AppealPage() {
   }
 
   function handleImportFromFhir() {
-    const fhirBaseUrl = import.meta.env.VITE_FHIR_BASE_URL ?? "";
-    setFhirImportStatus("importing");
     setFhirImportWarning("");
     setFhirImportError("");
+
+    if (!patientId.trim()) {
+      setFhirImportError("Enter a Patient ID first");
+      setFhirImportStatus("error");
+      return;
+    }
+
+    const fhirBaseUrl = import.meta.env.VITE_FHIR_BASE_URL ?? "";
+    setFhirImportStatus("importing");
 
     importPatientData(fhirBaseUrl, patientId)
       .then(({ record: imported, failures }) => {
