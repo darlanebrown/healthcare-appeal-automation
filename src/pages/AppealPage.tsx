@@ -58,6 +58,7 @@ export function AppealPage() {
     isFhirCallback(window.location.search) ? "importing" : "idle",
   );
   const [fhirImportError, setFhirImportError] = useState("");
+  const [fhirImportWarning, setFhirImportWarning] = useState("");
 
   useEffect(() => {
     if (!isFhirCallback(window.location.search)) return;
@@ -65,8 +66,11 @@ export function AppealPage() {
     const { clientId, redirectUri } = getFhirImportConfig(import.meta.env);
 
     completeFhirImport(window.location.search, { clientId, redirectUri })
-      .then((imported) => {
+      .then(({ record: imported, failures }) => {
         setRecord((current) => ({ ...current, ...imported }));
+        setFhirImportWarning(
+          failures.length > 0 ? `Imported, but couldn't load: ${failures.join(", ")}` : "",
+        );
         setFhirImportStatus("idle");
       })
       .catch((error: Error) => {
@@ -88,10 +92,15 @@ export function AppealPage() {
   function handleImportFromFhir() {
     const fhirBaseUrl = import.meta.env.VITE_FHIR_BASE_URL ?? "";
     setFhirImportStatus("importing");
+    setFhirImportWarning("");
+    setFhirImportError("");
 
     importPatientData(fhirBaseUrl, patientId)
-      .then((imported) => {
+      .then(({ record: imported, failures }) => {
         setRecord((current) => ({ ...current, ...imported }));
+        setFhirImportWarning(
+          failures.length > 0 ? `Imported, but couldn't load: ${failures.join(", ")}` : "",
+        );
         setFhirImportStatus("idle");
       })
       .catch((error: Error) => {
@@ -102,6 +111,8 @@ export function AppealPage() {
 
   function handleConnectToTenant() {
     const config = getFhirImportConfig(import.meta.env);
+    setFhirImportWarning("");
+    setFhirImportError("");
     startFhirImport(config).catch((error: Error) => {
       setFhirImportError(error.message);
       setFhirImportStatus("error");
@@ -152,6 +163,7 @@ export function AppealPage() {
           </button>
         </div>
         {fhirImportStatus === "error" && <p className="error">{fhirImportError}</p>}
+        {fhirImportWarning && <p className="warning">{fhirImportWarning}</p>}
       </header>
 
       <section className="layout">

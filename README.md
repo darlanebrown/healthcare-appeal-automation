@@ -54,12 +54,10 @@ All utilities in `src/utils/` are TDD'd (test file written and confirmed failing
 
 Toward automating data entry from an EHR instead of typing it in by hand. The client is vendor-neutral SMART on FHIR — it was originally scaffolded against Epic, then pointed at **Oracle Health's Millennium Platform** instead, and needs no Epic/Cerner-specific code to switch between them.
 
-Two ways to pull patient data are supported:
+Two ways to pull patient data are supported, both wired into the UI:
 
-- **Direct fetch (currently wired into the UI)** — for FHIR servers that allow unauthenticated reads, like Oracle Health's [public open sandbox](https://fhir-open.cerner.com/r4/ec2458f2-1e24-41c8-b71b-0e701af7583d) (tenant `ec2458f2-1e24-41c8-b71b-0e701af7583d`, e.g. test patient `12742400` — "Tim Peters"). The app calls `fetchFhirPatientData` straight away with `VITE_FHIR_BASE_URL` and a patient ID (typed into the UI, defaulting to `VITE_FHIR_DEFAULT_PATIENT_ID`) — no client registration or OAuth needed.
-- **SMART OAuth launch (scaffolded, not wired into the UI)** — for authenticated tenants or production EHR launch, using `VITE_FHIR_CLIENT_ID`/`VITE_FHIR_REDIRECT_URI`/`VITE_FHIR_SCOPES`:
-  - **EHR launch** — the app is opened *from inside* a live EHR session (e.g. a clinician's chart), which hands it `iss` (the FHIR base URL) and a `launch` token via the URL. Auth reuses that session context.
-  - **Standalone launch** — for testing against a vendor sandbox that requires OAuth: the app already knows its FHIR base URL and kicks off the OAuth redirect itself, using `scope=launch/patient` instead of a `launch` token, since there's no EHR session to hand one over.
+- **Direct fetch ("Import from Oracle Health" button)** — for FHIR servers that allow unauthenticated reads, like Oracle Health's [public open sandbox](https://fhir-open.cerner.com/r4/ec2458f2-1e24-41c8-b71b-0e701af7583d) (tenant `ec2458f2-1e24-41c8-b71b-0e701af7583d`, e.g. test patient `12742400` — "Tim Peters"). Calls `importPatientData` straight away with `VITE_FHIR_BASE_URL` and a patient ID (typed into the UI, defaulting to `VITE_FHIR_DEFAULT_PATIENT_ID`) — no client registration or OAuth needed.
+- **SMART OAuth launch ("Connect to Tenant" button)** — for an authenticated tenant, using `VITE_FHIR_TENANT_BASE_URL`/`VITE_FHIR_CLIENT_ID`/`VITE_FHIR_REDIRECT_URI`/`VITE_FHIR_SCOPES` (get these from your app registration in Oracle Health's developer portal). Clicking it calls `startFhirImport`, which redirects to the tenant's OAuth authorize endpoint (PKCE, state, the standalone-launch flow below); on redirect back, `AppealPage` detects the `code`/`state` callback params and calls `completeFhirImport` to finish the exchange and pull the patient's data. The same `smartAuth.ts` functions also support **EHR launch** (the app opened *from inside* a live EHR session, which hands it `iss`/`launch` instead of the app initiating the redirect) — that path isn't wired into the UI since it only makes sense embedded in a real EHR session, not a standalone dev server.
 
 - `services/smartAuth.ts`:
   - `parseLaunchParams` — reads `iss`/`launch` off an EHR launch URL
@@ -68,11 +66,11 @@ Two ways to pull patient data are supported:
   - `discoverSmartEndpoints` — reads `/.well-known/smart-configuration` for the authorization/token endpoints
   - `exchangeCodeForToken` — trades an authorization code + PKCE verifier for an access token
   - `startStandaloneLaunch` / `completeStandaloneLaunch` — the full standalone flow: discovers endpoints, generates and stores the PKCE verifier/state/FHIR base URL in `sessionStorage`, redirects (`start`), then on callback validates `state`, exchanges the code, and clears the stored state (`complete`)
-- `services/fhirClient.ts` — `fetchPatient`, `fetchPatientConditions`, `fetchDocumentReferences`, `fetchLabObservations`, and `fetchFhirPatientData` (fetches all four together) against the FHIR REST API. The access token is optional — omitted entirely for servers (like the open sandbox above) that don't require one.
+- `services/fhirClient.ts` — `fetchPatient`, `fetchPatientConditions`, `fetchDocumentReferences`, `fetchLabObservations`, and `fetchFhirPatientData` (fetches all four together) against the FHIR REST API. The access token is optional — omitted entirely for servers (like the open sandbox above) that don't require one. The `Patient` fetch is required (its failure fails the whole call, since there's nothing useful without it), but `Condition`/`DocumentReference`/`Observation` fetch concurrently via `Promise.allSettled` — if one of those fails or times out (the open sandbox is occasionally slow/flaky per-resource), the others still come back and the failure is reported by name in `failures` rather than losing everything.
 - `utils/mapFhirDataToRecord.ts` — pure mapping from fetched FHIR data to `Partial<Records>`: patient name/DOB, first ICD-coded condition, `DocumentReference`s routed to `progressNotes`/`historyAndPhysical`/`consultNotes`/`doctorSummary`/`nurseNotes` by matching their `type` text (multiple documents of the same type are joined), and lab `Observation`s joined into `labs`. Only pulls clinical data — an EHR isn't a payer system, so claim/billing/denial fields still need a separate source.
-- `services/fhirImport.ts` — orchestrates the above into what the UI calls: `importPatientData` (direct fetch + map, used by the "Import from Oracle Health" button), and `getFhirImportConfig`/`isFhirCallback`/`startFhirImport`/`completeFhirImport` (the OAuth flow, scaffolded but not yet wired into the UI).
+- `services/fhirImport.ts` — orchestrates the above into what the UI calls: `importPatientData` (direct fetch + map, used by the "Import from Oracle Health" button) and `getFhirImportConfig`/`isFhirCallback`/`startFhirImport`/`completeFhirImport` (the OAuth flow, used by "Connect to Tenant"). Both `importPatientData` and `completeFhirImport` return `{ record, failures }` — `failures` lists which FHIR resource types couldn't be fetched, surfaced in the UI as a warning banner alongside whatever data did come back.
 
-All of this is TDD'd (test file written and confirmed failing before implementation) against mocked `fetch`/`sessionStorage`/`location`/pure inputs. Next steps: wire up the OAuth flow in the UI for authenticated tenants/production EHR launch (same pattern as the direct-fetch button, calling `startFhirImport`/`completeFhirImport` instead of `importPatientData`); until then, only unauthenticated sandboxes work end-to-end.
+All of this is TDD'd (test file written and confirmed failing before implementation) against mocked `fetch`/`sessionStorage`/`location`/pure inputs, and also verified live against the real Oracle Health sandbox (both a clean import and a partial-failure one).
 
 ## Styling
 
@@ -80,7 +78,7 @@ All of this is TDD'd (test file written and confirmed failing before implementat
 
 ## Testing
 
-Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 10 test files, 68 tests.
+Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 9 test files, 65 tests.
 
 - `utils/validateRecord.test.ts` — required-field and `denialReason` validation
 - `utils/getMissingDocuments.test.ts` — missing-evidence checklist rules
@@ -89,8 +87,8 @@ Every module in `src/utils/` and `src/services/` was built TDD-style: its test f
 - `utils/mapFhirDataToRecord.test.ts` — FHIR data → `Records` field mapping
 - `services/appealService.test.ts` — `submitAppeal` against a mocked `fetch`
 - `services/smartAuth.test.ts` — SMART launch parsing, PKCE, authorization URL, discovery, token exchange, and the standalone launch start/complete flow against mocked `fetch`/`sessionStorage`/`location`
-- `services/fhirClient.test.ts` — Patient/Condition/DocumentReference/Observation fetches against a mocked `fetch`, including the no-access-token case
-- `services/fhirImport.test.ts` — direct patient-data import and the OAuth import flow, against mocked `smartAuth`/`fhirClient`/`mapFhirDataToRecord`
+- `services/fhirClient.test.ts` — Patient/Condition/DocumentReference/Observation fetches against a mocked `fetch`, including the no-access-token case and partial-failure handling (one resource fails, the rest still come back)
+- `services/fhirImport.test.ts` — direct patient-data import and the OAuth import flow, including surfacing per-resource failures, against mocked `smartAuth`/`fhirClient`/`mapFhirDataToRecord`
 
 Run the suite with `npm run test`.
 

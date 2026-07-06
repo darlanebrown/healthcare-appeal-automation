@@ -138,6 +138,11 @@ button:hover {
   font-weight: 700;
 }
 
+.hero .warning {
+  color: #fde68a;
+  font-weight: 700;
+}
+
 .muted {
   color: #64748b;
 }

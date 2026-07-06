@@ -86,14 +86,14 @@ describe("startFhirImport", () => {
 });
 
 describe("completeFhirImport", () => {
-  it("completes the launch, fetches patient data, and maps it to a partial record", async () => {
+  it("completes the launch, fetches patient data, and maps it to a partial record with any failures", async () => {
     completeStandaloneLaunchMock.mockResolvedValue({
       accessToken: "token-abc",
       patientId: "pt-1",
       fhirBaseUrl: "https://fhir-open.cerner.com/r4/ec2458f2-1e24-41c8-b71b-0e701af7583d",
     });
     const patientData = { patient: { resourceType: "Patient", id: "pt-1" }, conditions: [], documents: [], labs: [] };
-    fetchFhirPatientDataMock.mockResolvedValue(patientData);
+    fetchFhirPatientDataMock.mockResolvedValue({ data: patientData, failures: ["Condition"] });
     mapFhirDataToRecordMock.mockReturnValue({ patientName: "Jane Doe" });
 
     const result = await completeFhirImport("?code=auth-code&state=state-abc", {
@@ -111,7 +111,7 @@ describe("completeFhirImport", () => {
       "pt-1",
     );
     expect(mapFhirDataToRecordMock).toHaveBeenCalledWith(patientData);
-    expect(result).toEqual({ patientName: "Jane Doe" });
+    expect(result).toEqual({ record: { patientName: "Jane Doe" }, failures: ["Condition"] });
   });
 
   it("throws when the launch does not return a patient context", async () => {
@@ -132,9 +132,9 @@ describe("completeFhirImport", () => {
 });
 
 describe("importPatientData", () => {
-  it("fetches patient data with no access token and maps it to a partial record", async () => {
+  it("fetches patient data with no access token and maps it to a partial record with any failures", async () => {
     const patientData = { patient: { resourceType: "Patient", id: "pt-1" }, conditions: [], documents: [], labs: [] };
-    fetchFhirPatientDataMock.mockResolvedValue(patientData);
+    fetchFhirPatientDataMock.mockResolvedValue({ data: patientData, failures: [] });
     mapFhirDataToRecordMock.mockReturnValue({ patientName: "Tim Peters" });
 
     const result = await importPatientData(
@@ -148,15 +148,30 @@ describe("importPatientData", () => {
       "12742400",
     );
     expect(mapFhirDataToRecordMock).toHaveBeenCalledWith(patientData);
-    expect(result).toEqual({ patientName: "Tim Peters" });
+    expect(result).toEqual({ record: { patientName: "Tim Peters" }, failures: [] });
   });
 
   it("passes an access token through when given one (authenticated FHIR servers)", async () => {
-    fetchFhirPatientDataMock.mockResolvedValue({ patient: {}, conditions: [], documents: [], labs: [] });
+    fetchFhirPatientDataMock.mockResolvedValue({
+      data: { patient: {}, conditions: [], documents: [], labs: [] },
+      failures: [],
+    });
     mapFhirDataToRecordMock.mockReturnValue({});
 
     await importPatientData("https://fhir.example.org", "pt-1", "token-abc");
 
     expect(fetchFhirPatientDataMock).toHaveBeenCalledWith("https://fhir.example.org", "token-abc", "pt-1");
+  });
+
+  it("surfaces which resources failed alongside whatever mapped successfully", async () => {
+    fetchFhirPatientDataMock.mockResolvedValue({
+      data: { patient: { resourceType: "Patient", id: "pt-1" }, conditions: [], documents: [], labs: [] },
+      failures: ["Condition", "Observation"],
+    });
+    mapFhirDataToRecordMock.mockReturnValue({ patientName: "Nancy Smart" });
+
+    const result = await importPatientData("https://fhir-open.cerner.com/r4/tenant", "12724066");
+
+    expect(result).toEqual({ record: { patientName: "Nancy Smart" }, failures: ["Condition", "Observation"] });
   });
 });

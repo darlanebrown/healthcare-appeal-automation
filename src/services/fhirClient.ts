@@ -81,17 +81,38 @@ export async function fetchLabObservations(
   return extractResources(await response.json());
 }
 
+export type FhirPatientDataResult = {
+  data: FhirPatientData;
+  failures: string[];
+};
+
 export async function fetchFhirPatientData(
   fhirBaseUrl: string,
   accessToken: string | undefined,
   patientId: string,
-): Promise<FhirPatientData> {
-  const [patient, conditions, documents, labs] = await Promise.all([
-    fetchPatient(fhirBaseUrl, accessToken, patientId),
+): Promise<FhirPatientDataResult> {
+  const patient = await fetchPatient(fhirBaseUrl, accessToken, patientId);
+
+  const [conditions, documents, labs] = await Promise.allSettled([
     fetchPatientConditions(fhirBaseUrl, accessToken, patientId),
     fetchDocumentReferences(fhirBaseUrl, accessToken, patientId),
     fetchLabObservations(fhirBaseUrl, accessToken, patientId),
   ]);
 
-  return { patient, conditions, documents, labs };
+  const failures: string[] = [];
+  const resolve = <T>(result: PromiseSettledResult<T[]>, label: string): T[] => {
+    if (result.status === "fulfilled") return result.value;
+    failures.push(label);
+    return [];
+  };
+
+  return {
+    data: {
+      patient,
+      conditions: resolve(conditions, "Condition"),
+      documents: resolve(documents, "DocumentReference"),
+      labs: resolve(labs, "Observation"),
+    },
+    failures,
+  };
 }

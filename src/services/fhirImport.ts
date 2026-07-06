@@ -21,10 +21,15 @@ export function startFhirImport(config: StandaloneLaunchConfig): Promise<void> {
   return startStandaloneLaunch(config);
 }
 
+export type ImportPatientDataResult = {
+  record: Partial<Records>;
+  failures: string[];
+};
+
 export async function completeFhirImport(
   callbackSearch: string,
   config: { clientId: string; redirectUri: string },
-): Promise<Partial<Records>> {
+): Promise<ImportPatientDataResult> {
   const { accessToken, patientId, fhirBaseUrl } = await completeStandaloneLaunch(callbackSearch, config);
 
   if (!patientId) {
@@ -38,7 +43,7 @@ export async function importPatientData(
   fhirBaseUrl: string,
   patientId: string,
   accessToken?: string,
-): Promise<Partial<Records>> {
-  const data = await fetchFhirPatientData(fhirBaseUrl, accessToken, patientId);
-  return mapFhirDataToRecord(data);
+): Promise<ImportPatientDataResult> {
+  const { data, failures } = await fetchFhirPatientData(fhirBaseUrl, accessToken, patientId);
+  return { record: mapFhirDataToRecord(data), failures };
 }

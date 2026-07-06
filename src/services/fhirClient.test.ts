@@ -142,10 +142,46 @@ describe("fetchFhirPatientData", () => {
     const result = await fetchFhirPatientData(FHIR_BASE, TOKEN, "pt-1");
 
     expect(result).toEqual({
-      patient,
-      conditions: [{ resourceType: "Condition", id: "c1" }],
-      documents: [{ resourceType: "DocumentReference", id: "d1" }],
-      labs: [{ resourceType: "Observation", id: "o1" }],
+      data: {
+        patient,
+        conditions: [{ resourceType: "Condition", id: "c1" }],
+        documents: [{ resourceType: "DocumentReference", id: "d1" }],
+        labs: [{ resourceType: "Observation", id: "o1" }],
+      },
+      failures: [],
     });
+  });
+
+  it("keeps the patient and succeeding resources when one resource fetch fails", async () => {
+    const patient = { resourceType: "Patient", id: "pt-1" };
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith(`${FHIR_BASE}/Condition`)) {
+        return Promise.resolve({ ok: false, status: 504, statusText: "Gateway Time-out" });
+      }
+      if (url === `${FHIR_BASE}/Patient/pt-1`) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(patient) });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ resourceType: "Bundle", entry: [] }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchFhirPatientData(FHIR_BASE, TOKEN, "pt-1");
+
+    expect(result).toEqual({
+      data: { patient, conditions: [], documents: [], labs: [] },
+      failures: ["Condition"],
+    });
+  });
+
+  it("throws when the patient fetch itself fails, since there's nothing useful without it", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404, statusText: "Not Found" });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchFhirPatientData(FHIR_BASE, TOKEN, "missing")).rejects.toThrow(
+      "Failed to fetch Patient/missing: 404 Not Found",
+    );
   });
 });
