@@ -5,7 +5,7 @@ import { mapFhirDataToRecord } from "../utils/mapFhirDataToRecord";
 
 export function getFhirImportConfig(env: Record<string, string | undefined>): StandaloneLaunchConfig {
   return {
-    fhirBaseUrl: env.VITE_FHIR_BASE_URL ?? "",
+    fhirBaseUrl: env.VITE_FHIR_TENANT_BASE_URL ?? "",
     clientId: env.VITE_FHIR_CLIENT_ID ?? "",
     redirectUri: env.VITE_FHIR_REDIRECT_URI ?? "",
     scope: env.VITE_FHIR_SCOPES ?? "",

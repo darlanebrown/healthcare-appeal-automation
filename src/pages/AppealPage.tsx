@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Records } from "../types";
 import { getMissingDocuments } from "../utils/getMissingDocuments";
 import { generateAppealDocket } from "../utils/generateAppealDocket";
 import { addSupply, removeSupply, updateSupplyField } from "../utils/supplies";
-import { getFhirImportConfig, importPatientData } from "../services/fhirImport";
+import {
+  completeFhirImport,
+  getFhirImportConfig,
+  importPatientData,
+  isFhirCallback,
+  startFhirImport,
+} from "../services/fhirImport";
 import { PatientInfoCard } from "../components/PatientInfoCard";
 import { SuppliesCard } from "../components/SuppliesCard";
 import { BillingCard } from "../components/BillingCard";
@@ -48,8 +54,29 @@ export function AppealPage() {
   const [record, setRecord] = useState<Records>(initialRecord);
   const [appealDocket, setAppealDocket] = useState("");
   const [patientId, setPatientId] = useState(() => import.meta.env.VITE_FHIR_DEFAULT_PATIENT_ID ?? "");
-  const [fhirImportStatus, setFhirImportStatus] = useState<FhirImportStatus>("idle");
+  const [fhirImportStatus, setFhirImportStatus] = useState<FhirImportStatus>(() =>
+    isFhirCallback(window.location.search) ? "importing" : "idle",
+  );
   const [fhirImportError, setFhirImportError] = useState("");
+
+  useEffect(() => {
+    if (!isFhirCallback(window.location.search)) return;
+
+    const { clientId, redirectUri } = getFhirImportConfig(import.meta.env);
+
+    completeFhirImport(window.location.search, { clientId, redirectUri })
+      .then((imported) => {
+        setRecord((current) => ({ ...current, ...imported }));
+        setFhirImportStatus("idle");
+      })
+      .catch((error: Error) => {
+        setFhirImportError(error.message);
+        setFhirImportStatus("error");
+      })
+      .finally(() => {
+        window.history.replaceState({}, "", window.location.pathname);
+      });
+  }, []);
 
   function updateField(field: keyof Records, value: string) {
     setRecord((current) => ({
@@ -59,7 +86,7 @@ export function AppealPage() {
   }
 
   function handleImportFromFhir() {
-    const { fhirBaseUrl } = getFhirImportConfig(import.meta.env);
+    const fhirBaseUrl = import.meta.env.VITE_FHIR_BASE_URL ?? "";
     setFhirImportStatus("importing");
 
     importPatientData(fhirBaseUrl, patientId)
@@ -71,6 +98,14 @@ export function AppealPage() {
         setFhirImportError(error.message);
         setFhirImportStatus("error");
       });
+  }
+
+  function handleConnectToTenant() {
+    const config = getFhirImportConfig(import.meta.env);
+    startFhirImport(config).catch((error: Error) => {
+      setFhirImportError(error.message);
+      setFhirImportStatus("error");
+    });
   }
 
   function handleGenerateAppeal() {
@@ -111,6 +146,9 @@ export function AppealPage() {
           />
           <button type="button" onClick={handleImportFromFhir} disabled={fhirImportStatus === "importing"}>
             {fhirImportStatus === "importing" ? "Importing…" : "Import from Oracle Health"}
+          </button>
+          <button type="button" onClick={handleConnectToTenant} disabled={fhirImportStatus === "importing"}>
+            Connect to Tenant
           </button>
         </div>
         {fhirImportStatus === "error" && <p className="error">{fhirImportError}</p>}

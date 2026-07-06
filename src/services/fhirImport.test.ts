@@ -31,16 +31,16 @@ afterEach(() => {
 });
 
 describe("getFhirImportConfig", () => {
-  it("reads the standalone launch config out of an env-like object", () => {
+  it("reads the OAuth tenant config out of an env-like object", () => {
     const config = getFhirImportConfig({
-      VITE_FHIR_BASE_URL: "https://fhir-open.cerner.com/r4/ec2458f2-1e24-41c8-b71b-0e701af7583d",
+      VITE_FHIR_TENANT_BASE_URL: "https://fhir-myrecord.cerner.com/r4/some-tenant-id",
       VITE_FHIR_CLIENT_ID: "client-123",
       VITE_FHIR_REDIRECT_URI: "https://app.example.com/callback",
       VITE_FHIR_SCOPES: "launch/patient openid fhirUser patient/*.read",
     });
 
     expect(config).toEqual({
-      fhirBaseUrl: "https://fhir-open.cerner.com/r4/ec2458f2-1e24-41c8-b71b-0e701af7583d",
+      fhirBaseUrl: "https://fhir-myrecord.cerner.com/r4/some-tenant-id",
       clientId: "client-123",
       redirectUri: "https://app.example.com/callback",
       scope: "launch/patient openid fhirUser patient/*.read",
