@@ -52,7 +52,7 @@ export type FhirBundle<T> = {
   entry?: FhirBundleEntry<T>[];
 };
 
-export type EpicPatientData = {
+export type FhirPatientData = {
   patient: FhirPatient;
   conditions: FhirCondition[];
   documents: FhirDocumentReference[];
@@ -74,7 +74,7 @@ export type PkcePair = {
   challenge: string;
 };
 
-export type EpicTokenResponse = {
+export type SmartTokenResponse = {
   access_token: string;
   patient?: string;
   expires_in?: number;

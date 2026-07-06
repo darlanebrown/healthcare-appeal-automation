@@ -1,5 +1,5 @@
 import type { Records } from "../types";
-import type { EpicPatientData, FhirDocumentReference } from "../types/epic";
+import type { FhirPatientData, FhirDocumentReference } from "../types/fhir";
 
 const NOTE_TYPE_FIELDS: { match: RegExp; field: "progressNotes" | "historyAndPhysical" | "consultNotes" | "doctorSummary" | "nurseNotes" }[] = [
   { match: /history and physical/i, field: "historyAndPhysical" },
@@ -19,21 +19,21 @@ function matchNoteField(document: FhirDocumentReference) {
   return NOTE_TYPE_FIELDS.find(({ match }) => match.test(label))?.field ?? null;
 }
 
-function formatPatientName(patient: EpicPatientData["patient"]): string | undefined {
+function formatPatientName(patient: FhirPatientData["patient"]): string | undefined {
   const name = patient.name?.[0];
   if (!name) return undefined;
   if (name.text) return name.text;
   return [...(name.given ?? []), name.family].filter(Boolean).join(" ") || undefined;
 }
 
-function formatObservation(observation: EpicPatientData["labs"][number]): string {
+function formatObservation(observation: FhirPatientData["labs"][number]): string {
   const label = observation.code?.text ?? observation.code?.coding?.[0]?.display ?? "Lab result";
   const value = observation.valueString
     ?? (observation.valueQuantity ? `${observation.valueQuantity.value} ${observation.valueQuantity.unit ?? ""}`.trim() : "");
   return `${label}: ${value}`;
 }
 
-export function mapEpicDataToRecord(data: EpicPatientData): Partial<Records> {
+export function mapFhirDataToRecord(data: FhirPatientData): Partial<Records> {
   const result: Partial<Records> = {};
 
   const patientName = formatPatientName(data.patient);

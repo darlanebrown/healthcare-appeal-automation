@@ -50,26 +50,29 @@ All utilities in `src/utils/` are TDD'd (test file written and confirmed failing
 
 `VITE_API_BASE_URL` is read from the environment (see `.env.example`); no real backend is wired up yet, so this defaults to a placeholder URL. Not yet called from the UI — currently only available as a service function.
 
-## Epic Integration (Scaffold)
+## FHIR Integration
 
-Toward automating data entry from Epic instead of typing it in by hand. Two SMART on FHIR launch flows are supported:
+Toward automating data entry from an EHR instead of typing it in by hand. The client is vendor-neutral SMART on FHIR — it was originally scaffolded against Epic, then pointed at **Oracle Health's Millennium Platform** instead, and needs no Epic/Cerner-specific code to switch between them.
 
-- **EHR launch** — for real production use: the app is opened *from inside* a live Epic session (e.g. a clinician's chart in Hyperspace), which hands it `iss` (the FHIR base URL) and a `launch` token via the URL. Auth reuses that session context.
-- **Standalone launch** — for testing against [Epic's free public sandbox](https://fhir.epic.com) (no live Epic instance required): the app already knows its FHIR base URL (`VITE_EPIC_FHIR_BASE_URL`) and kicks off the OAuth redirect itself, using `scope=launch/patient` instead of a `launch` token, since there's no EHR session to hand one over.
+Two ways to pull patient data are supported:
 
-No Epic App Orchard registration exists yet, so this is a working scaffold behind placeholder env vars (`VITE_EPIC_CLIENT_ID`, `VITE_EPIC_REDIRECT_URI`, `VITE_EPIC_SCOPES`, `VITE_EPIC_FHIR_BASE_URL` in `.env.example`) — not yet wired into the UI.
+- **Direct fetch (currently wired into the UI)** — for FHIR servers that allow unauthenticated reads, like Oracle Health's [public open sandbox](https://fhir-open.cerner.com/r4/ec2458f2-1e24-41c8-b71b-0e701af7583d) (tenant `ec2458f2-1e24-41c8-b71b-0e701af7583d`, e.g. test patient `12742400` — "Tim Peters"). The app calls `fetchFhirPatientData` straight away with `VITE_FHIR_BASE_URL` and a patient ID (typed into the UI, defaulting to `VITE_FHIR_DEFAULT_PATIENT_ID`) — no client registration or OAuth needed.
+- **SMART OAuth launch (scaffolded, not wired into the UI)** — for authenticated tenants or production EHR launch, using `VITE_FHIR_CLIENT_ID`/`VITE_FHIR_REDIRECT_URI`/`VITE_FHIR_SCOPES`:
+  - **EHR launch** — the app is opened *from inside* a live EHR session (e.g. a clinician's chart), which hands it `iss` (the FHIR base URL) and a `launch` token via the URL. Auth reuses that session context.
+  - **Standalone launch** — for testing against a vendor sandbox that requires OAuth: the app already knows its FHIR base URL and kicks off the OAuth redirect itself, using `scope=launch/patient` instead of a `launch` token, since there's no EHR session to hand one over.
 
-- `services/epicAuth.ts`:
+- `services/smartAuth.ts`:
   - `parseLaunchParams` — reads `iss`/`launch` off an EHR launch URL
   - `generatePkcePair` — PKCE verifier + SHA-256 challenge
   - `buildAuthorizationUrl` — builds the OAuth authorize URL (`launch` is optional, per the standalone case above)
   - `discoverSmartEndpoints` — reads `/.well-known/smart-configuration` for the authorization/token endpoints
   - `exchangeCodeForToken` — trades an authorization code + PKCE verifier for an access token
-  - `startStandaloneLaunch` / `completeStandaloneLaunch` — the full standalone flow: discovers endpoints, generates and stores the PKCE verifier/state/FHIR base URL in `sessionStorage`, redirects to Epic (`start`), then on callback validates `state`, exchanges the code, and clears the stored state (`complete`)
-- `services/epicFhirClient.ts` — `fetchPatient`, `fetchPatientConditions`, `fetchDocumentReferences`, `fetchLabObservations`, and `fetchEpicPatientData` (fetches all four together) against the FHIR REST API with a bearer token.
-- `utils/mapEpicDataToRecord.ts` — pure mapping from fetched FHIR data to `Partial<Records>`: patient name/DOB, first ICD-coded condition, `DocumentReference`s routed to `progressNotes`/`historyAndPhysical`/`consultNotes`/`doctorSummary`/`nurseNotes` by matching their `type` text (multiple documents of the same type are joined), and lab `Observation`s joined into `labs`. Only pulls clinical data — Epic isn't a payer system, so claim/billing/denial fields still need a separate source.
+  - `startStandaloneLaunch` / `completeStandaloneLaunch` — the full standalone flow: discovers endpoints, generates and stores the PKCE verifier/state/FHIR base URL in `sessionStorage`, redirects (`start`), then on callback validates `state`, exchanges the code, and clears the stored state (`complete`)
+- `services/fhirClient.ts` — `fetchPatient`, `fetchPatientConditions`, `fetchDocumentReferences`, `fetchLabObservations`, and `fetchFhirPatientData` (fetches all four together) against the FHIR REST API. The access token is optional — omitted entirely for servers (like the open sandbox above) that don't require one.
+- `utils/mapFhirDataToRecord.ts` — pure mapping from fetched FHIR data to `Partial<Records>`: patient name/DOB, first ICD-coded condition, `DocumentReference`s routed to `progressNotes`/`historyAndPhysical`/`consultNotes`/`doctorSummary`/`nurseNotes` by matching their `type` text (multiple documents of the same type are joined), and lab `Observation`s joined into `labs`. Only pulls clinical data — an EHR isn't a payer system, so claim/billing/denial fields still need a separate source.
+- `services/fhirImport.ts` — orchestrates the above into what the UI calls: `importPatientData` (direct fetch + map, used by the "Import from Oracle Health" button), and `getFhirImportConfig`/`isFhirCallback`/`startFhirImport`/`completeFhirImport` (the OAuth flow, scaffolded but not yet wired into the UI).
 
-All of this is TDD'd (test file written and confirmed failing before implementation) against mocked `fetch`/`sessionStorage`/`location`/pure inputs — no network or real Epic sandbox required to verify the logic. Next steps to make this real: register a free non-production app at fhir.epic.com to get a real client ID, sandbox FHIR base URL, and test patients; swap the placeholder env vars for those real values; call `startStandaloneLaunch` (sandbox) or handle an EHR launch URL with `parseLaunchParams` (production) plus a callback route calling `completeStandaloneLaunch`/`exchangeCodeForToken`; and add an "Import from Epic" action in the UI that calls `fetchEpicPatientData` → `mapEpicDataToRecord` and merges the result into the form state.
+All of this is TDD'd (test file written and confirmed failing before implementation) against mocked `fetch`/`sessionStorage`/`location`/pure inputs. Next steps: wire up the OAuth flow in the UI for authenticated tenants/production EHR launch (same pattern as the direct-fetch button, calling `startFhirImport`/`completeFhirImport` instead of `importPatientData`); until then, only unauthenticated sandboxes work end-to-end.
 
 ## Styling
 
@@ -77,16 +80,17 @@ All of this is TDD'd (test file written and confirmed failing before implementat
 
 ## Testing
 
-Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 8 test files, 52 tests.
+Every module in `src/utils/` and `src/services/` was built TDD-style: its test file was written and confirmed failing (red) before the implementation existed, then the implementation was added until the suite passed (green). Current suite: 10 test files, 68 tests.
 
 - `utils/validateRecord.test.ts` — required-field and `denialReason` validation
 - `utils/getMissingDocuments.test.ts` — missing-evidence checklist rules
 - `utils/generateAppealDocket.test.ts` — appeal letter content, including the supplies-used section
 - `utils/supplies.test.ts` — create/add/remove/update helpers for the real-time supplies list
-- `utils/mapEpicDataToRecord.test.ts` — FHIR data → `Records` field mapping
+- `utils/mapFhirDataToRecord.test.ts` — FHIR data → `Records` field mapping
 - `services/appealService.test.ts` — `submitAppeal` against a mocked `fetch`
-- `services/epicAuth.test.ts` — SMART launch parsing, PKCE, authorization URL, discovery, token exchange, and the standalone launch start/complete flow against mocked `fetch`/`sessionStorage`/`location`
-- `services/epicFhirClient.test.ts` — Patient/Condition/DocumentReference/Observation fetches against a mocked `fetch`
+- `services/smartAuth.test.ts` — SMART launch parsing, PKCE, authorization URL, discovery, token exchange, and the standalone launch start/complete flow against mocked `fetch`/`sessionStorage`/`location`
+- `services/fhirClient.test.ts` — Patient/Condition/DocumentReference/Observation fetches against a mocked `fetch`, including the no-access-token case
+- `services/fhirImport.test.ts` — direct patient-data import and the OAuth import flow, against mocked `smartAuth`/`fhirClient`/`mapFhirDataToRecord`
 
 Run the suite with `npm run test`.
 

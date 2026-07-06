@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchDocumentReferences,
-  fetchEpicPatientData,
+  fetchFhirPatientData,
   fetchLabObservations,
   fetchPatient,
   fetchPatientConditions,
-} from "./epicFhirClient";
+} from "./fhirClient";
 
-const FHIR_BASE = "https://epic.example.org/fhir";
+const FHIR_BASE = "https://fhir-open.cerner.com/r4/ec2458f2-1e24-41c8-b71b-0e701af7583d";
 const TOKEN = "token-abc";
 
 function mockFetchOnce(body: unknown) {
@@ -40,6 +40,18 @@ describe("fetchPatient", () => {
 
     await expect(fetchPatient(FHIR_BASE, TOKEN, "missing")).rejects.toThrow(
       "Failed to fetch Patient/missing: 404 Not Found",
+    );
+  });
+
+  it("omits the Authorization header when no access token is given (open sandbox)", async () => {
+    const patient = { resourceType: "Patient", id: "pt-1" };
+    const fetchMock = mockFetchOnce(patient);
+
+    await fetchPatient(FHIR_BASE, undefined, "pt-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${FHIR_BASE}/Patient/pt-1`,
+      { headers: { Accept: "application/fhir+json" } },
     );
   });
 });
@@ -104,7 +116,7 @@ describe("fetchLabObservations", () => {
   });
 });
 
-describe("fetchEpicPatientData", () => {
+describe("fetchFhirPatientData", () => {
   it("fetches the patient, conditions, documents, and labs together", async () => {
     const patient = { resourceType: "Patient", id: "pt-1" };
     const responsesByUrl: Record<string, unknown> = {
@@ -127,7 +139,7 @@ describe("fetchEpicPatientData", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await fetchEpicPatientData(FHIR_BASE, TOKEN, "pt-1");
+    const result = await fetchFhirPatientData(FHIR_BASE, TOKEN, "pt-1");
 
     expect(result).toEqual({
       patient,

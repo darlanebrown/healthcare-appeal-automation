@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { mapEpicDataToRecord } from "./mapEpicDataToRecord";
-import type { EpicPatientData } from "../types/epic";
+import { mapFhirDataToRecord } from "./mapFhirDataToRecord";
+import type { FhirPatientData } from "../types/fhir";
 
 function encode(text: string): string {
   return btoa(text);
 }
 
-function makeData(overrides: Partial<EpicPatientData> = {}): EpicPatientData {
+function makeData(overrides: Partial<FhirPatientData> = {}): FhirPatientData {
   return {
     patient: {
       resourceType: "Patient",
@@ -21,16 +21,16 @@ function makeData(overrides: Partial<EpicPatientData> = {}): EpicPatientData {
   };
 }
 
-describe("mapEpicDataToRecord", () => {
+describe("mapFhirDataToRecord", () => {
   it("maps patient name and date of birth", () => {
-    const result = mapEpicDataToRecord(makeData());
+    const result = mapFhirDataToRecord(makeData());
 
     expect(result.patientName).toBe("Maria Gonzalez");
     expect(result.dateOfBirth).toBe("1975-03-22");
   });
 
   it("maps the first ICD-coded condition to icdCode", () => {
-    const result = mapEpicDataToRecord(
+    const result = mapFhirDataToRecord(
       makeData({
         conditions: [
           {
@@ -48,7 +48,7 @@ describe("mapEpicDataToRecord", () => {
   });
 
   it("routes document references to the matching note field by type", () => {
-    const result = mapEpicDataToRecord(
+    const result = mapFhirDataToRecord(
       makeData({
         documents: [
           {
@@ -79,7 +79,7 @@ describe("mapEpicDataToRecord", () => {
   });
 
   it("joins multiple documents of the same type with a blank line", () => {
-    const result = mapEpicDataToRecord(
+    const result = mapFhirDataToRecord(
       makeData({
         documents: [
           {
@@ -102,7 +102,7 @@ describe("mapEpicDataToRecord", () => {
   });
 
   it("maps lab observations into a single labs string", () => {
-    const result = mapEpicDataToRecord(
+    const result = mapFhirDataToRecord(
       makeData({
         labs: [
           {
@@ -124,8 +124,8 @@ describe("mapEpicDataToRecord", () => {
     expect(result.labs).toBe("MRI Shoulder: Full-thickness rotator cuff tear.\nHemoglobin A1c: 6.1 %");
   });
 
-  it("omits fields with no matching Epic data", () => {
-    const result = mapEpicDataToRecord(makeData());
+  it("omits fields with no matching FHIR data", () => {
+    const result = mapFhirDataToRecord(makeData());
 
     expect(result.icdCode).toBeUndefined();
     expect(result.progressNotes).toBeUndefined();

@@ -1,14 +1,16 @@
 import type {
-  EpicPatientData,
+  FhirPatientData,
   FhirBundle,
   FhirCondition,
   FhirDocumentReference,
   FhirObservation,
   FhirPatient,
-} from "../types/epic";
+} from "../types/fhir";
 
-function authHeaders(accessToken: string) {
-  return { Authorization: `Bearer ${accessToken}`, Accept: "application/fhir+json" };
+function authHeaders(accessToken?: string): Record<string, string> {
+  return accessToken
+    ? { Authorization: `Bearer ${accessToken}`, Accept: "application/fhir+json" }
+    : { Accept: "application/fhir+json" };
 }
 
 function extractResources<T>(bundle: FhirBundle<T>): T[] {
@@ -17,7 +19,7 @@ function extractResources<T>(bundle: FhirBundle<T>): T[] {
 
 export async function fetchPatient(
   fhirBaseUrl: string,
-  accessToken: string,
+  accessToken: string | undefined,
   patientId: string,
 ): Promise<FhirPatient> {
   const response = await fetch(`${fhirBaseUrl}/Patient/${patientId}`, {
@@ -33,7 +35,7 @@ export async function fetchPatient(
 
 export async function fetchPatientConditions(
   fhirBaseUrl: string,
-  accessToken: string,
+  accessToken: string | undefined,
   patientId: string,
 ): Promise<FhirCondition[]> {
   const response = await fetch(`${fhirBaseUrl}/Condition?patient=${patientId}`, {
@@ -49,7 +51,7 @@ export async function fetchPatientConditions(
 
 export async function fetchDocumentReferences(
   fhirBaseUrl: string,
-  accessToken: string,
+  accessToken: string | undefined,
   patientId: string,
 ): Promise<FhirDocumentReference[]> {
   const response = await fetch(`${fhirBaseUrl}/DocumentReference?patient=${patientId}`, {
@@ -65,7 +67,7 @@ export async function fetchDocumentReferences(
 
 export async function fetchLabObservations(
   fhirBaseUrl: string,
-  accessToken: string,
+  accessToken: string | undefined,
   patientId: string,
 ): Promise<FhirObservation[]> {
   const response = await fetch(`${fhirBaseUrl}/Observation?patient=${patientId}&category=laboratory`, {
@@ -79,11 +81,11 @@ export async function fetchLabObservations(
   return extractResources(await response.json());
 }
 
-export async function fetchEpicPatientData(
+export async function fetchFhirPatientData(
   fhirBaseUrl: string,
-  accessToken: string,
+  accessToken: string | undefined,
   patientId: string,
-): Promise<EpicPatientData> {
+): Promise<FhirPatientData> {
   const [patient, conditions, documents, labs] = await Promise.all([
     fetchPatient(fhirBaseUrl, accessToken, patientId),
     fetchPatientConditions(fhirBaseUrl, accessToken, patientId),

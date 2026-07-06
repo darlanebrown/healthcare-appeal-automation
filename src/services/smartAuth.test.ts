@@ -7,7 +7,7 @@ import {
   generatePkcePair,
   parseLaunchParams,
   startStandaloneLaunch,
-} from "./epicAuth";
+} from "./smartAuth";
 
 function createStorageMock(initial: Record<string, string> = {}) {
   const store: Record<string, string> = { ...initial };
@@ -24,8 +24,8 @@ function createStorageMock(initial: Record<string, string> = {}) {
 
 describe("parseLaunchParams", () => {
   it("extracts iss and launch from a query string", () => {
-    const result = parseLaunchParams("?iss=https%3A%2F%2Fepic.example.org%2Ffhir&launch=abc123");
-    expect(result).toEqual({ iss: "https://epic.example.org/fhir", launch: "abc123" });
+    const result = parseLaunchParams("?iss=https%3A%2F%2Ffhir.example.org%2Ffhir&launch=abc123");
+    expect(result).toEqual({ iss: "https://fhir.example.org/fhir", launch: "abc123" });
   });
 
   it("returns nulls when the params are missing", () => {
@@ -53,24 +53,24 @@ describe("generatePkcePair", () => {
 describe("buildAuthorizationUrl", () => {
   it("builds a PKCE authorization URL with the SMART launch params", () => {
     const url = buildAuthorizationUrl({
-      authorizationEndpoint: "https://epic.example.org/oauth2/authorize",
+      authorizationEndpoint: "https://fhir.example.org/oauth2/authorize",
       clientId: "client-123",
       redirectUri: "https://app.example.com/callback",
       scope: "launch openid fhirUser patient/*.read",
       launch: "abc123",
-      iss: "https://epic.example.org/fhir",
+      iss: "https://fhir.example.org/fhir",
       state: "state-xyz",
       codeChallenge: "challenge-abc",
     });
 
     const parsed = new URL(url);
-    expect(parsed.origin + parsed.pathname).toBe("https://epic.example.org/oauth2/authorize");
+    expect(parsed.origin + parsed.pathname).toBe("https://fhir.example.org/oauth2/authorize");
     expect(parsed.searchParams.get("response_type")).toBe("code");
     expect(parsed.searchParams.get("client_id")).toBe("client-123");
     expect(parsed.searchParams.get("redirect_uri")).toBe("https://app.example.com/callback");
     expect(parsed.searchParams.get("scope")).toBe("launch openid fhirUser patient/*.read");
     expect(parsed.searchParams.get("launch")).toBe("abc123");
-    expect(parsed.searchParams.get("aud")).toBe("https://epic.example.org/fhir");
+    expect(parsed.searchParams.get("aud")).toBe("https://fhir.example.org/fhir");
     expect(parsed.searchParams.get("state")).toBe("state-xyz");
     expect(parsed.searchParams.get("code_challenge")).toBe("challenge-abc");
     expect(parsed.searchParams.get("code_challenge_method")).toBe("S256");
@@ -78,11 +78,11 @@ describe("buildAuthorizationUrl", () => {
 
   it("omits the launch param for standalone launch (no launch value)", () => {
     const url = buildAuthorizationUrl({
-      authorizationEndpoint: "https://epic.example.org/oauth2/authorize",
+      authorizationEndpoint: "https://fhir.example.org/oauth2/authorize",
       clientId: "client-123",
       redirectUri: "https://app.example.com/callback",
       scope: "launch/patient openid fhirUser patient/*.read",
-      iss: "https://epic.example.org/fhir",
+      iss: "https://fhir.example.org/fhir",
       state: "state-xyz",
       codeChallenge: "challenge-abc",
     });
@@ -100,20 +100,20 @@ describe("discoverSmartEndpoints", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        authorization_endpoint: "https://epic.example.org/oauth2/authorize",
-        token_endpoint: "https://epic.example.org/oauth2/token",
+        authorization_endpoint: "https://fhir.example.org/oauth2/authorize",
+        token_endpoint: "https://fhir.example.org/oauth2/token",
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const endpoints = await discoverSmartEndpoints("https://epic.example.org/fhir");
+    const endpoints = await discoverSmartEndpoints("https://fhir.example.org/fhir");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://epic.example.org/fhir/.well-known/smart-configuration",
+      "https://fhir.example.org/fhir/.well-known/smart-configuration",
     );
     expect(endpoints).toEqual({
-      authorizationEndpoint: "https://epic.example.org/oauth2/authorize",
-      tokenEndpoint: "https://epic.example.org/oauth2/token",
+      authorizationEndpoint: "https://fhir.example.org/oauth2/authorize",
+      tokenEndpoint: "https://fhir.example.org/oauth2/token",
     });
   });
 });
@@ -130,7 +130,7 @@ describe("exchangeCodeForToken", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await exchangeCodeForToken("https://epic.example.org/oauth2/token", {
+    const result = await exchangeCodeForToken("https://fhir.example.org/oauth2/token", {
       code: "auth-code",
       redirectUri: "https://app.example.com/callback",
       clientId: "client-123",
@@ -139,7 +139,7 @@ describe("exchangeCodeForToken", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://epic.example.org/oauth2/token");
+    expect(url).toBe("https://fhir.example.org/oauth2/token");
     expect(options.method).toBe("POST");
     expect(options.headers).toEqual({ "Content-Type": "application/x-www-form-urlencoded" });
 
@@ -158,7 +158,7 @@ describe("exchangeCodeForToken", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      exchangeCodeForToken("https://epic.example.org/oauth2/token", {
+      exchangeCodeForToken("https://fhir.example.org/oauth2/token", {
         code: "bad-code",
         redirectUri: "https://app.example.com/callback",
         clientId: "client-123",
@@ -177,8 +177,8 @@ describe("startStandaloneLaunch", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        authorization_endpoint: "https://epic.example.org/oauth2/authorize",
-        token_endpoint: "https://epic.example.org/oauth2/token",
+        authorization_endpoint: "https://fhir.example.org/oauth2/authorize",
+        token_endpoint: "https://fhir.example.org/oauth2/token",
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -190,7 +190,7 @@ describe("startStandaloneLaunch", () => {
     vi.stubGlobal("location", location);
 
     await startStandaloneLaunch({
-      fhirBaseUrl: "https://epic.example.org/fhir",
+      fhirBaseUrl: "https://fhir.example.org/fhir",
       clientId: "client-123",
       redirectUri: "https://app.example.com/callback",
       scope: "launch/patient openid fhirUser patient/*.read",
@@ -198,17 +198,17 @@ describe("startStandaloneLaunch", () => {
 
     expect(storage.setItem).toHaveBeenCalledTimes(1);
     const [key, storedValue] = storage.setItem.mock.calls[0];
-    expect(key).toBe("epic_standalone_launch");
+    expect(key).toBe("smart_standalone_launch");
     const stored = JSON.parse(storedValue);
-    expect(stored.fhirBaseUrl).toBe("https://epic.example.org/fhir");
+    expect(stored.fhirBaseUrl).toBe("https://fhir.example.org/fhir");
     expect(typeof stored.verifier).toBe("string");
     expect(typeof stored.state).toBe("string");
 
     expect(location.assign).toHaveBeenCalledTimes(1);
     const redirectUrl = new URL(location.assign.mock.calls[0][0]);
-    expect(redirectUrl.origin + redirectUrl.pathname).toBe("https://epic.example.org/oauth2/authorize");
+    expect(redirectUrl.origin + redirectUrl.pathname).toBe("https://fhir.example.org/oauth2/authorize");
     expect(redirectUrl.searchParams.get("state")).toBe(stored.state);
-    expect(redirectUrl.searchParams.get("aud")).toBe("https://epic.example.org/fhir");
+    expect(redirectUrl.searchParams.get("aud")).toBe("https://fhir.example.org/fhir");
     expect(redirectUrl.searchParams.has("launch")).toBe(false);
   });
 });
@@ -221,10 +221,10 @@ describe("completeStandaloneLaunch", () => {
   it("exchanges the code using the stored verifier and returns the token result", async () => {
     const storedState = "state-abc";
     const storage = createStorageMock({
-      epic_standalone_launch: JSON.stringify({
+      smart_standalone_launch: JSON.stringify({
         verifier: "verifier-xyz",
         state: storedState,
-        fhirBaseUrl: "https://epic.example.org/fhir",
+        fhirBaseUrl: "https://fhir.example.org/fhir",
       }),
     });
     vi.stubGlobal("sessionStorage", storage);
@@ -234,8 +234,8 @@ describe("completeStandaloneLaunch", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
-          authorization_endpoint: "https://epic.example.org/oauth2/authorize",
-          token_endpoint: "https://epic.example.org/oauth2/token",
+          authorization_endpoint: "https://fhir.example.org/oauth2/authorize",
+          token_endpoint: "https://fhir.example.org/oauth2/token",
         }),
       })
       .mockResolvedValueOnce({
@@ -252,17 +252,17 @@ describe("completeStandaloneLaunch", () => {
     expect(result).toEqual({
       accessToken: "token-abc",
       patientId: "pt-1",
-      fhirBaseUrl: "https://epic.example.org/fhir",
+      fhirBaseUrl: "https://fhir.example.org/fhir",
     });
-    expect(storage.removeItem).toHaveBeenCalledWith("epic_standalone_launch");
+    expect(storage.removeItem).toHaveBeenCalledWith("smart_standalone_launch");
   });
 
   it("throws when the callback state does not match the stored state", async () => {
     const storage = createStorageMock({
-      epic_standalone_launch: JSON.stringify({
+      smart_standalone_launch: JSON.stringify({
         verifier: "verifier-xyz",
         state: "expected-state",
-        fhirBaseUrl: "https://epic.example.org/fhir",
+        fhirBaseUrl: "https://fhir.example.org/fhir",
       }),
     });
     vi.stubGlobal("sessionStorage", storage);

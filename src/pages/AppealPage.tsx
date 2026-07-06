@@ -3,6 +3,7 @@ import type { Records } from "../types";
 import { getMissingDocuments } from "../utils/getMissingDocuments";
 import { generateAppealDocket } from "../utils/generateAppealDocket";
 import { addSupply, removeSupply, updateSupplyField } from "../utils/supplies";
+import { getFhirImportConfig, importPatientData } from "../services/fhirImport";
 import { PatientInfoCard } from "../components/PatientInfoCard";
 import { SuppliesCard } from "../components/SuppliesCard";
 import { BillingCard } from "../components/BillingCard";
@@ -41,15 +42,35 @@ const initialRecord: Records = {
   requestedOutcome: "",
 };
 
+type FhirImportStatus = "idle" | "importing" | "error";
+
 export function AppealPage() {
   const [record, setRecord] = useState<Records>(initialRecord);
   const [appealDocket, setAppealDocket] = useState("");
+  const [patientId, setPatientId] = useState(() => import.meta.env.VITE_FHIR_DEFAULT_PATIENT_ID ?? "");
+  const [fhirImportStatus, setFhirImportStatus] = useState<FhirImportStatus>("idle");
+  const [fhirImportError, setFhirImportError] = useState("");
 
   function updateField(field: keyof Records, value: string) {
     setRecord((current) => ({
       ...current,
       [field]: value,
     }));
+  }
+
+  function handleImportFromFhir() {
+    const { fhirBaseUrl } = getFhirImportConfig(import.meta.env);
+    setFhirImportStatus("importing");
+
+    importPatientData(fhirBaseUrl, patientId)
+      .then((imported) => {
+        setRecord((current) => ({ ...current, ...imported }));
+        setFhirImportStatus("idle");
+      })
+      .catch((error: Error) => {
+        setFhirImportError(error.message);
+        setFhirImportStatus("error");
+      });
   }
 
   function handleGenerateAppeal() {
@@ -78,10 +99,21 @@ export function AppealPage() {
       <header className="hero">
         <p className="eyebrow">Appeal Automation</p>
         <h1>Healthcare Appeal Automation</h1>
-        <p>
+        <p className="hero-description">
           Billing and clinical evidence are collected across intake forms and
           automatically forwarded into the final Appeal Docket/Form.
         </p>
+        <div className="fhir-import">
+          <input
+            placeholder="Patient ID"
+            value={patientId}
+            onChange={(e) => setPatientId(e.target.value)}
+          />
+          <button type="button" onClick={handleImportFromFhir} disabled={fhirImportStatus === "importing"}>
+            {fhirImportStatus === "importing" ? "Importing…" : "Import from Oracle Health"}
+          </button>
+        </div>
+        {fhirImportStatus === "error" && <p className="error">{fhirImportError}</p>}
       </header>
 
       <section className="layout">

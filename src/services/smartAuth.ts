@@ -1,4 +1,4 @@
-import type { EpicTokenResponse, PkcePair, SmartEndpoints, SmartLaunchParams } from "../types/epic";
+import type { SmartTokenResponse, PkcePair, SmartEndpoints, SmartLaunchParams } from "../types/fhir";
 
 export function parseLaunchParams(search: string): SmartLaunchParams {
   const params = new URLSearchParams(search);
@@ -60,7 +60,7 @@ export async function discoverSmartEndpoints(fhirBaseUrl: string): Promise<Smart
 export async function exchangeCodeForToken(
   tokenEndpoint: string,
   params: { code: string; redirectUri: string; clientId: string; codeVerifier: string },
-): Promise<EpicTokenResponse> {
+): Promise<SmartTokenResponse> {
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     code: params.code,
@@ -82,7 +82,7 @@ export async function exchangeCodeForToken(
   return response.json();
 }
 
-const STANDALONE_LAUNCH_STORAGE_KEY = "epic_standalone_launch";
+const STANDALONE_LAUNCH_STORAGE_KEY = "smart_standalone_launch";
 
 export type StandaloneLaunchConfig = {
   fhirBaseUrl: string;
